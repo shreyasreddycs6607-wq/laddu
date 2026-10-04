@@ -3,7 +3,7 @@
 ## Unit tests (JVM, no device) — `./gradlew :app:testDebugUnitTest`
 (72 tests, all passing at the time of writing.)  
 *Windows machines where Gradle cannot fork JVMs* (`Unable to establish loopback connection`): run
-`.\scriptsun_unit_tests.ps1` — it compiles the tests via `:app:dumpUnitTestClasspath` and runs them with JUnit in a plain JVM.
+`.\scripts\run_unit_tests.ps1` — it compiles the tests via `:app:dumpUnitTestClasspath` and runs them with JUnit in a plain JVM.
 
 | Area | File | Covers |
 |---|---|---|
