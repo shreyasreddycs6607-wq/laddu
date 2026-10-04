@@ -1,0 +1,103 @@
+rules_version = '2';
+
+// Laddu Firestore security rules.
+// Model: a camera is owned by one user (devices/{id}.ownerId). Other accounts get access only
+// through a deviceUsers/{cameraId}_{uid} document, which can only be created by redeeming a
+// short-lived, one-time pairingSessions/{token} document created by the camera's owner.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+    function devicePath(cameraId) { return /databases/$(database)/documents/devices/$(cameraId); }
+    function isOwner(cameraId) {
+      return signedIn() && get(devicePath(cameraId)).data.ownerId == uid();
+    }
+    function isViewer(cameraId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/deviceUsers/$(cameraId + '_' + uid()));
+    }
+    function hasAccess(cameraId) { return isOwner(cameraId) || isViewer(cameraId); }
+    function unchanged(field) { return request.resource.data[field] == resource.data[field]; }
+
+    // ---- users: private profile + FCM tokens --------------------------------------------
+    match /users/{userId} {
+      allow read, write: if signedIn() && uid() == userId;
+    }
+
+    match /notificationPreferences/{userId} {
+      allow read, write: if signedIn() && uid() == userId;
+    }
+
+    // ---- devices (cameras) --------------------------------------------------------------
+    match /devices/{cameraId} {
+      allow get: if signedIn() && (resource == null || resource.data.ownerId == uid() || isViewer(cameraId));
+      allow list: if signedIn() && resource.data.ownerId == uid();
+      allow create: if signedIn() && request.resource.data.ownerId == uid();
+      allow update: if signedIn() && resource.data.ownerId == uid() && unchanged('ownerId');
+      allow delete: if signedIn() && resource.data.ownerId == uid();
+
+      // WebRTC signaling. Camera = offerer, viewer = answerer. Only paired accounts.
+      match /liveSessions/{sessionId} {
+        allow read: if hasAccess(cameraId);
+        allow create: if hasAccess(cameraId)
+          && request.resource.data.viewerId == uid()
+          && request.resource.data.state == 'requested';
+        allow update: if hasAccess(cameraId);
+        allow delete: if hasAccess(cameraId);
+
+        match /cameraCandidates/{id} { allow read, write: if hasAccess(cameraId); }
+        match /viewerCandidates/{id} { allow read, write: if hasAccess(cameraId); }
+      }
+    }
+
+    // ---- viewer authorisation ------------------------------------------------------------
+    match /deviceUsers/{id} {
+      allow get: if signedIn() && (resource.data.userId == uid() || isOwner(resource.data.cameraId));
+      allow list: if signedIn() && (resource.data.userId == uid() || isOwner(resource.data.cameraId));
+      // Redeem a pairing token: must be unused + unexpired, and for this camera.
+      allow create: if signedIn()
+        && request.resource.data.userId == uid()
+        && id == request.resource.data.cameraId + '_' + uid()
+        && get(/databases/$(database)/documents/pairingSessions/$(request.resource.data.pairingToken)).data.cameraId
+             == request.resource.data.cameraId
+        && get(/databases/$(database)/documents/pairingSessions/$(request.resource.data.pairingToken)).data.used == false
+        && get(/databases/$(database)/documents/pairingSessions/$(request.resource.data.pairingToken)).data.expiresAt
+             > request.time;
+      // Owner revokes a viewer, or a viewer removes themselves.
+      allow delete: if signedIn() && (resource.data.userId == uid() || isOwner(resource.data.cameraId));
+    }
+
+    // ---- one-time pairing tokens (the document id IS the 256-bit secret) -----------------
+    match /pairingSessions/{token} {
+      allow get: if signedIn();   // knowing the unguessable id is the capability
+      allow list: if false;       // tokens can never be enumerated
+      allow create: if signedIn()
+        && isOwner(request.resource.data.cameraId)
+        && request.resource.data.ownerId == uid()
+        && request.resource.data.used == false
+        && request.resource.data.expiresAt <= request.time + duration.value(10, 'm');
+      allow update: if signedIn()
+        && resource.data.used == false
+        && resource.data.expiresAt > request.time
+        && request.resource.data.used == true
+        && request.resource.data.usedBy == uid()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['used', 'usedBy', 'usedAt']);
+      allow delete: if signedIn() && resource.data.ownerId == uid();
+    }
+
+    // ---- events -------------------------------------------------------------------------
+    match /events/{eventId} {
+      allow read: if signedIn() && hasAccess(resource.data.cameraId);
+      allow create, update: if signedIn()
+        && request.resource.data.ownerId == uid()
+        && isOwner(request.resource.data.cameraId);
+      allow delete: if signedIn() && isOwner(resource.data.cameraId);
+    }
+
+    // ---- remote camera settings (viewers may adjust) -------------------------------------
+    match /settings/{cameraId} {
+      allow read, write: if signedIn() && hasAccess(cameraId);
+    }
+  }
+}

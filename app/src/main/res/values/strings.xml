@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Laddu</string>
+    <string name="channel_monitoring">Monitoring</string>
+    <string name="channel_monitoring_desc">Shown while this phone is watching your dog</string>
+    <string name="channel_bark">Barking alerts</string>
+    <string name="channel_movement">Movement alerts</string>
+    <string name="channel_dog">Dog presence alerts</string>
+    <string name="channel_system">Camera &amp; system alerts</string>
+    <string name="monitoring_title">Laddu is monitoring your dog</string>
+    <string name="monitoring_text">Camera and microphone are active</string>
+    <string name="action_open">Open Laddu</string>
+    <string name="action_stop">Stop Monitoring</string>
+</resources>

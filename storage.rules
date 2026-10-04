@@ -1,0 +1,22 @@
+rules_version = '2';
+
+// Event clips / snapshots are uploaded only by the camera's owner and readable only by
+// accounts that own or are paired with that camera. Nothing is public.
+service firebase.storage {
+  match /b/{bucket}/o {
+    function ownerOf(cameraId) {
+      return firestore.get(/databases/(default)/documents/devices/$(cameraId)).data.ownerId == request.auth.uid;
+    }
+    function viewerOf(cameraId) {
+      return firestore.exists(/databases/(default)/documents/deviceUsers/$(cameraId + '_' + request.auth.uid));
+    }
+
+    match /clips/{cameraId}/{file} {
+      allow read: if request.auth != null && (ownerOf(cameraId) || viewerOf(cameraId));
+      allow write: if request.auth != null && ownerOf(cameraId)
+        && request.resource.size < 50 * 1024 * 1024
+        && (request.resource.contentType.matches('video/mp4') || request.resource.contentType.matches('image/jpeg'));
+      allow delete: if request.auth != null && ownerOf(cameraId);
+    }
+  }
+}

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Laddu.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/laddu_splash_bg</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_laddu_paw</item>
+        <item name="postSplashScreenTheme">@style/Theme.Laddu</item>
+    </style>
+
+    <style name="Theme.Laddu" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>
