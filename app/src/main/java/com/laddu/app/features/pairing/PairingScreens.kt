@@ -112,7 +112,9 @@ class CameraPairingViewModel @Inject constructor(
     val ui: StateFlow<CameraPairingUi> = _ui
     private var watch: Job? = null
 
-    init {
+    init { setup() }
+
+    private fun setup() {
         viewModelScope.launch {
             val uid = auth.currentUid
             if (uid == null) { _ui.update { it.copy(loading = false, error = "Sign in to pair a viewer.") }; return@launch }
@@ -129,6 +131,7 @@ class CameraPairingViewModel @Inject constructor(
     }
 
     fun regenerate() {
+        if (_ui.value.cameraId.isBlank()) { _ui.update { it.copy(loading = true, error = null) }; setup(); return } // registration failed earlier: retry it
         watch?.cancel()
         val id = _ui.value.cameraId
         val uid = auth.currentUid ?: return
