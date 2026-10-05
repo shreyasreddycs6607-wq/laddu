@@ -28,7 +28,15 @@ class MediaRepository @Inject constructor(
     suspend fun clip(ref: String, eventId: String): Result<File> = runCatching {
         withContext(Dispatchers.IO) {
             val f = File(File(ctx.cacheDir, "shared").apply { mkdirs() }, "$eventId.mp4")
-            if (!f.exists() || f.length() == 0L) fb.storage.reference.child(ref).getFile(f).await()
+            if (!f.exists() || f.length() == 0L) {
+                // download beside the target and rename: an interrupted download must never look like a finished clip
+                val part = File(f.parentFile, "$eventId.part")
+                part.delete()
+                try {
+                    fb.storage.reference.child(ref).getFile(part).await()
+                    if (!part.renameTo(f)) error("Could not save the clip")
+                } finally { part.delete() }
+            }
             f
         }
     }
