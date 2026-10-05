@@ -2,6 +2,7 @@ package com.laddu.app.features.settings
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -9,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -25,6 +28,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -89,7 +93,9 @@ fun SettingsContent(ui: SettingsUi, a: SettingsActions, modifier: Modifier = Mod
     var confirmSignOut by remember { mutableStateOf(false) }
     val cam = ui.camera
 
-    Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp).testTag("settings_screen")) {
+    // On tablets keep the form a readable width, centred, instead of stretching every control across the screen.
+    Box(modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+    Column(Modifier.widthIn(max = 640.dp).fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp).testTag("settings_screen")) {
         Text("Settings", style = MaterialTheme.typography.headlineMedium)
 
         if (viewer) {
@@ -231,6 +237,7 @@ fun SettingsContent(ui: SettingsUi, a: SettingsActions, modifier: Modifier = Mod
         }
         Spacer(Modifier.height(24.dp))
     }
+    } // readable-width Box
 
     if (confirmDelete) AlertDialog(
         onDismissRequest = { confirmDelete = false },
@@ -285,7 +292,20 @@ fun <T> ChoiceRow(label: String, options: List<T>, selected: T, name: (T) -> Str
     Column(Modifier.padding(vertical = 4.dp)) {
         Text(label, style = MaterialTheme.typography.bodyLarge)
         androidx.compose.foundation.layout.FlowRow(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            options.forEach { o -> FilterChip(selected == o, { onSelect(o) }, label = { Text(name(o)) }, enabled = enabled) }
+            options.forEach { o ->
+                // a clearly filled, ticked chip for the current choice (the default tint was easy to miss)
+                FilterChip(
+                    selected == o, { onSelect(o) }, label = { Text(name(o)) }, enabled = enabled,
+                    leadingIcon = if (selected == o) {
+                        { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.Check, null, Modifier.size(androidx.compose.material3.FilterChipDefaults.IconSize)) }
+                    } else null,
+                    colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = MaterialTheme.colorScheme.primary,
+                        selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                        selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary,
+                    ),
+                )
+            }
         }
     }
 }
