@@ -99,8 +99,17 @@ class CameraMonitoringService : LifecycleService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
+        // A sticky restart after the OS killed us starts a camera/mic service from the background, which Android 11+
+        // forbids: ask the user to resume instead (the dashboard also resumes on open).
+        if (intent == null && Build.VERSION.SDK_INT >= 30) {
+            notifier.showResumeNeeded(); stopSelf(startId); return START_NOT_STICKY
+        }
         when (intent?.action) {
-            ACTION_STOP -> { shutdown(); return START_NOT_STICKY }
+            ACTION_STOP -> {
+                // the notification's Stop must also clear the "want monitoring" flag, or the app would resume it
+                lifecycleScope.launch(NonCancellable) { settings.setMonitoringDesired(false) }
+                shutdown(); return START_NOT_STICKY
+            }
             ACTION_RESTART -> {
                 if (session?.isActive == true) lifecycleScope.launch { restartSession() } else begin()
             }
@@ -119,7 +128,12 @@ class CameraMonitoringService : LifecycleService() {
         val camOk = granted(Manifest.permission.CAMERA)
         val micOk = granted(Manifest.permission.RECORD_AUDIO)
         if (!enterForeground(camOk, micOk)) return
-        session = lifecycleScope.launch {
+        // a failing worker must stop monitoring cleanly, not crash the whole app
+        val onFailure = kotlinx.coroutines.CoroutineExceptionHandler { _, t ->
+            holder.update { it.copy(error = t.message ?: "Monitoring failed", running = false, starting = false) }
+            shutdown()
+        }
+        session = lifecycleScope.launch(onFailure) {
             if (!settings.monitoringDesired.first()) { shutdown(); return@launch }
             try {
                 runSession()
@@ -162,7 +176,8 @@ class CameraMonitoringService : LifecycleService() {
         runCatching {
             val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
             @Suppress("DEPRECATION")
-            val mode = if (Build.VERSION.SDK_INT >= 29) WifiManager.WIFI_MODE_FULL_LOW_LATENCY else WifiManager.WIFI_MODE_FULL_HIGH_PERF
+            // low-latency mode only works on API 34+ with the screen off; older versions need high-perf to keep Wi-Fi awake
+            val mode = if (Build.VERSION.SDK_INT >= 34) WifiManager.WIFI_MODE_FULL_LOW_LATENCY else WifiManager.WIFI_MODE_FULL_HIGH_PERF
             wifiLock = wm.createWifiLock(mode, "laddu:wifi").apply { setReferenceCounted(false); acquire() }
         }
     }
@@ -327,6 +342,8 @@ class CameraMonitoringService : LifecycleService() {
                 if ((st is CameraEngineState.Error || (st is CameraEngineState.Running && stale)) && System.currentTimeMillis() - lastCameraAttempt > 10_000) {
                     startCamera(current)
                 }
+                // the microphone can fail (busy, read error, handed back by WebRTC): retry; no-ops while it is running
+                if (live.activeViewers.value == 0) updateAudio(current)
             }
         }
         scope.launch { cameraEngine.state.collect { st -> publishCameraState(st) } }
@@ -405,11 +422,13 @@ class CameraMonitoringService : LifecycleService() {
 
     /** Full re-initialisation of camera + audio + models without leaving monitoring. */
     private suspend fun restartSession() {
+        if (shuttingDown || !::audio.isInitialized) return // shutting down, or the session has not been built yet
         holder.update { it.copy(starting = true) }
         audio.stopAndJoin()
         cameraEngine.stop()
         dogEngine.close(); barkEngine.close()
         delay(500)
+        if (shuttingDown) return
         applyRuntimeConfig(current, healthNow.thermal)
         startCamera(current)
         updateAudio(current)
