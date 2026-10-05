@@ -58,5 +58,11 @@ object Paths {
     fun snapshotPath(cameraId: String, eventId: String) = "clips/$cameraId/$eventId.jpg"
 }
 
-/** Network calls that may block forever while offline are bounded. Returns null on timeout. */
+/**
+ * Network calls that may block forever while offline are bounded. Returns null on timeout.
+ * Do NOT use the result to detect success of a write: a successful Task<Void> also yields null. Use [awaitDone].
+ */
 suspend fun <T> Task<T>.awaitOrNull(timeoutMs: Long = 15_000): T? = withTimeoutOrNull(timeoutMs) { await() }
+
+/** True when the task completed successfully within [timeoutMs]; false on timeout. Failures still throw. */
+suspend fun Task<*>.awaitDone(timeoutMs: Long = 15_000): Boolean = withTimeoutOrNull(timeoutMs) { await(); true } ?: false

@@ -43,7 +43,7 @@ class DeviceRepository @Inject constructor(private val fb: FirebaseProvider) {
                 "platform" to "android",
             ),
             SetOptions.merge(),
-        ).awaitOrNull() ?: error("Could not reach Firebase")
+        ).awaitDone().let { ok -> if (!ok) error("Could not reach Firebase") }
     }
 
     suspend fun heartbeat(cameraId: String, status: CameraStatus) {
