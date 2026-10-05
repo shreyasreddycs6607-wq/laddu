@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -71,7 +72,7 @@ class SettingsViewModel @Inject constructor(
     /** Settings of the camera being controlled from a viewer phone (null when none selected / not loaded). */
     private val remoteCamera = settings.selectedCameraId.flatMapLatest { id ->
         if (id == null) flowOf(null) else combine(remote.observe(id), devices.observeCamera(id)) { r, cam -> Triple(id, r, cam) }
-    }
+    }.onStart { emit(null) } // never hold the whole screen back waiting for Firestore
 
     private data class Base(val mode: AppMode?, val email: String, val theme: ThemeChoice, val local: CameraSettings, val notif: NotificationPrefs)
     private data class Rest(val rec: RecordingSettings, val net: NetworkSettings, val health: DeviceHealth)
@@ -79,7 +80,7 @@ class SettingsViewModel @Inject constructor(
     private val base = combine(settings.appMode, auth.authState, settings.theme, localCamera, settings.notificationPrefs) { m, a, t, c, n ->
         Base(m, (a as? AuthState.SignedIn)?.user?.email.orEmpty(), t, c, n)
     }
-    private val rest = combine(settings.recordingSettings, settings.networkSettings, health.health) { r, n, h -> Rest(r, n, h) }
+    private val rest = combine(settings.recordingSettings, settings.networkSettings, health.health.onStart { emit(DeviceHealth()) }) { r, n, h -> Rest(r, n, h) }
 
     val ui: StateFlow<SettingsUi> = combine(base, rest, remoteCamera) { b, r, rc ->
         val viewer = b.mode == AppMode.VIEWER
