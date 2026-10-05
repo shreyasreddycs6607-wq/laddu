@@ -36,7 +36,7 @@ class FakeEventDao : EventDao {
         val del = rows.values.filter { it.synced && it.timestamp < before }.map { it.eventId }
         del.forEach { rows.remove(it) }; refresh(); return del.size
     }
-    override suspend fun closeOngoing() = 0
+    override suspend fun closeOngoing(now: Long) = 0
     override suspend fun clear() { rows.clear(); refresh() }
 }
 
@@ -79,26 +79,25 @@ class EventSyncTest {
         assertEquals(listOf("a"), remote.uploaded)
     }
 
-    @Test fun `an event modified while uploading is NOT marked synced and uploads again`() = runTest {
+    @Test fun `an event modified while uploading is NOT marked synced by the stale upload and is re-sent`() = runTest {
         val dao = FakeEventDao(); val remote = FakeRemote()
         val sync = EventSyncManager(dao, remote)
         dao.upsert(ev("a", 1).copy(durationMs = 0).toEntity(updatedAt = 100))
         // while the (slow) upload is in flight, the event is completed locally
         remote.onUpload = { dao.upsert(ev("a", 1).copy(durationMs = 5000).toEntity(updatedAt = 200)) }
         sync.syncPending()
-        assertFalse(dao.rows.getValue("a").synced)
-        remote.onUpload = null
-        sync.syncPending()
+        // the stale v1 upload must not mark v2 synced; the same pass re-reads the row and sends the completed v2
         assertTrue(dao.rows.getValue("a").synced)
         assertEquals(2, remote.uploaded.size) // v1 then the completed v2
+        assertEquals(5000L, dao.rows.getValue("a").durationMs)
     }
 
-    @Test fun `local-only events are never lost and batch size is respected`() = runTest {
+    @Test fun `a large offline backlog is drained in batches`() = runTest {
         val dao = FakeEventDao(); val remote = FakeRemote()
         val sync = EventSyncManager(dao, remote)
         (1..120).forEach { dao.upsert(ev("e$it", it.toLong()).toEntity()) }
-        assertEquals(50, sync.syncPending(50).uploaded)
-        assertEquals(70, dao.rows.values.count { !it.synced })
+        assertEquals(120, sync.syncPending(50).uploaded)
+        assertEquals(0, dao.rows.values.count { !it.synced })
     }
 
     @Test fun `events of an unknown future type do not block the queue`() = runTest {
