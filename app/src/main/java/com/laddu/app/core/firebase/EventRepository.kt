@@ -17,7 +17,9 @@ const val LOCAL_OWNER = "local"
 class FirestoreEventRemote @Inject constructor(private val fb: FirebaseProvider) : EventRemote {
     override suspend fun upload(event: LadduEvent): Boolean {
         if (event.ownerId == LOCAL_OWNER) return true // local-only mode: nothing to upload
-        if (!fb.isConfigured || fb.currentUid != event.ownerId) return false
+        if (!fb.isConfigured) return false
+        val uid = fb.currentUid ?: return false // signed out: retry after sign-in
+        if (uid != event.ownerId) return true // another account's event can never upload from here; do not block the queue
         return runCatching {
             fb.firestore.collection(Paths.EVENTS).document(event.eventId).set(event.toMap()).awaitDone(20_000)
         }.getOrDefault(false)
