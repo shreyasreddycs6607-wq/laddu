@@ -108,7 +108,7 @@ fun ViewerShell(
 
     Scaffold(
         bottomBar = {
-            if (!fullscreen) NavigationBar(Modifier.testTag("viewer_nav")) {
+            if (!(fullscreen && route == Routes.VIEWER_LIVE)) NavigationBar(Modifier.testTag("viewer_nav")) {
                 TABS.forEach { t ->
                     NavigationBarItem(
                         selected = route == t.route,

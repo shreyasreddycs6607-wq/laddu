@@ -188,6 +188,9 @@ fun LiveScreen(
         onStopOrDispose { vm.stop() }
     }
     HideSystemBars(fullscreen)
+    // Back leaves fullscreen first; leaving the Live tab must never leave the shell stuck in fullscreen.
+    androidx.activity.compose.BackHandler(enabled = fullscreen) { onFullscreenChange(false) }
+    androidx.compose.runtime.DisposableEffect(Unit) { onDispose { onFullscreenChange(false) } }
 
     LiveContent(
         ui = ui, cameraName = cameraName, fullscreen = fullscreen, eglContext = vm.eglContext,
