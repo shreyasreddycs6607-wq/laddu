@@ -46,6 +46,20 @@ class DeviceRepository @Inject constructor(private val fb: FirebaseProvider) {
         ).awaitDone().let { ok -> if (!ok) error("Could not reach Firebase") }
     }
 
+    /**
+     * Registers this phone for [ownerId]. If the saved camera id is owned by another account (the user switched
+     * accounts), moves to a fresh id from [rotate]. Returns the id in use.
+     */
+    suspend fun ensureCamera(current: String, ownerId: String, name: String, rotate: suspend () -> String): Result<String> {
+        var id = current
+        var r = registerCamera(id, ownerId, name)
+        val msg = r.exceptionOrNull()?.message.orEmpty()
+        if (msg.contains("PERMISSION_DENIED") || msg.contains("already registered")) {
+            id = rotate(); r = registerCamera(id, ownerId, name)
+        }
+        return r.map { id }
+    }
+
     suspend fun heartbeat(cameraId: String, status: CameraStatus) {
         if (!fb.isConfigured || fb.currentUid == null) return
         runCatching {

@@ -91,7 +91,8 @@ class IceServerProvider @Inject constructor(private val fb: FirebaseProvider) {
         PeerConnection.RTCConfiguration(servers).apply {
             sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
             continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_CONTINUALLY
-            iceTransportsType = if (forceRelay) PeerConnection.IceTransportsType.RELAY else PeerConnection.IceTransportsType.ALL
+            // Relay-only without a TURN server can never connect, so the switch only applies once one is configured.
+            iceTransportsType = if (forceRelay && hasTurn) PeerConnection.IceTransportsType.RELAY else PeerConnection.IceTransportsType.ALL
             bundlePolicy = PeerConnection.BundlePolicy.MAXBUNDLE
             rtcpMuxPolicy = PeerConnection.RtcpMuxPolicy.REQUIRE
             // DTLS-SRTP is always on in WebRTC: media is end-to-end encrypted between the two phones.

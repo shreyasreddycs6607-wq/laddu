@@ -81,6 +81,7 @@ class SignalingRepository @Inject constructor(private val fb: FirebaseProvider) 
         if (!fb.isConfigured) return flowOf(null)
         return callbackFlow {
             val reg = sessions(cameraId).document(sessionId).addSnapshotListener { s, e ->
+                if (e != null) android.util.Log.w("Laddu", "session listener failed", e)
                 trySend(if (e != null || s == null) null else s.toSession(cameraId))
             }
             awaitClose { reg.remove() }
@@ -103,7 +104,7 @@ class SignalingRepository @Inject constructor(private val fb: FirebaseProvider) 
         if (!fb.isConfigured) return flowOf(emptyList())
         return callbackFlow {
             val reg = sessions(cameraId).addSnapshotListener { s, e ->
-                if (e != null) return@addSnapshotListener
+                if (e != null) { android.util.Log.w("Laddu", "signaling listener failed", e); close(e); return@addSnapshotListener }
                 trySend(s?.documents?.mapNotNull { it.toSession(cameraId) }.orEmpty())
             }
             awaitClose { reg.remove() }

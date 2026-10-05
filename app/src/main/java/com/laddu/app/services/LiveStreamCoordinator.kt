@@ -70,11 +70,14 @@ class LiveStreamCoordinator @Inject constructor(
     fun start(cameraId: String, ownerId: String) {
         if (scope != null) return
         this.cameraId = cameraId
+        android.util.Log.i("Laddu", "live coordinator start camera=$cameraId owner=$ownerId")
         val s = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         scope = s
         s.launch { signaling.deleteStale(cameraId, 10 * 60_000L) }
         s.launch {
-            signaling.observeActiveSessions(cameraId).collect { docs ->
+            while (isActive) { // the listener dies on any error (e.g. auth not ready yet): resubscribe
+              runCatching { signaling.observeActiveSessions(cameraId).collect { docs ->
+                android.util.Log.i("Laddu", "live sessions seen: ${docs.map { it.id.take(6) + ":" + it.state }}")
                 val now = System.currentTimeMillis()
                 for (d in docs) {
                     if (d.state == SessionState.ENDED || d.state == SessionState.FAILED) continue
@@ -84,6 +87,8 @@ class LiveStreamCoordinator @Inject constructor(
                     if (peers.size >= MAX_VIEWERS) { signaling.setState(cameraId, d.id, SessionState.FAILED); continue }
                     createPeer(d.id, d.quality)
                 }
+              } }
+              delay(3_000)
             }
         }
         s.launch { // every few minutes drop abandoned sessions
@@ -95,6 +100,7 @@ class LiveStreamCoordinator @Inject constructor(
     }
 
     private suspend fun createPeer(sessionId: String, requested: String) {
+        android.util.Log.i("Laddu", "creating peer for session $sessionId")
         ensureMedia()
         val net = settings.networkSettings.first()
         val servers = ice.servers()

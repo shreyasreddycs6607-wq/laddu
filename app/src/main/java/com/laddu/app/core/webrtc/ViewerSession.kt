@@ -101,6 +101,7 @@ class ViewerSession(
             pc = conn
             remoteSet = false
             val sid = signaling.createSession(cameraId, viewerId, quality.name)
+            android.util.Log.i("Laddu", "viewer created session $sid for camera=$cameraId")
             sessionId = sid
 
             attempt = scope.launch {
@@ -141,17 +142,20 @@ class ViewerSession(
                 }
             }
         } catch (t: Throwable) {
+            android.util.Log.w("Laddu", "viewer session failed", t)
             apply(sm.onEvent(LiveEvent.Timeout))
         }
     }
 
     private val observer = object : PeerConnection.Observer {
         override fun onIceCandidate(c: IceCandidate) {
+            android.util.Log.i("Laddu", "viewer ice candidate: ${c.sdp.substringAfter("typ ").take(6)} ${c.sdp.split(" ").getOrNull(4)}")
             val sid = sessionId ?: return
             scope.launch { signaling.addCandidate(cameraId, sid, false, IceCandidateDoc(c.sdpMid, c.sdpMLineIndex, c.sdp)) }
         }
 
         override fun onIceConnectionChange(s: PeerConnection.IceConnectionState) {
+            android.util.Log.i("Laddu", "viewer ice state: $s")
             when (s) {
                 PeerConnection.IceConnectionState.CONNECTED, PeerConnection.IceConnectionState.COMPLETED -> {
                     graceJob?.cancel(); apply(sm.onEvent(LiveEvent.IceConnected))
@@ -167,6 +171,7 @@ class ViewerSession(
         }
 
         override fun onTrack(t: RtpTransceiver) {
+            android.util.Log.i("Laddu", "viewer got track ${t.receiver.track()?.kind()}")
             when (val track = t.receiver.track()) {
                 is VideoTrack -> { track.setEnabled(true); _video.value = track }
                 is AudioTrack -> { audio = track; track.setEnabled(!muted) }

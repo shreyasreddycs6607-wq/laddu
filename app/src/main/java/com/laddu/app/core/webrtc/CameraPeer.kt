@@ -86,6 +86,7 @@ class CameraPeer(
                     if (!connected) close()
                 }
             } catch (t: Throwable) {
+            android.util.Log.w("Laddu", "camera peer failed", t)
                 close()
             }
         }
@@ -93,9 +94,11 @@ class CameraPeer(
 
     private val observer = object : PeerConnection.Observer {
         override fun onIceCandidate(c: IceCandidate) {
+            android.util.Log.i("Laddu", "camera ice candidate: ${c.sdp.substringAfter("typ ").take(6)} ${c.sdp.split(" ").getOrNull(4)}")
             scope.launch { signaling.addCandidate(cameraId, sessionId, true, IceCandidateDoc(c.sdpMid, c.sdpMLineIndex, c.sdp)) }
         }
         override fun onIceConnectionChange(s: PeerConnection.IceConnectionState) {
+            android.util.Log.i("Laddu", "camera ice state: $s")
             when (s) {
                 PeerConnection.IceConnectionState.CONNECTED, PeerConnection.IceConnectionState.COMPLETED -> {
                     graceJob?.cancel()

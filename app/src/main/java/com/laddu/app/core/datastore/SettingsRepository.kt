@@ -79,6 +79,13 @@ class SettingsRepository @Inject constructor(private val store: DataStore<Prefer
         return store.data.first()[K.cameraId] ?: id
     }
 
+    /** The saved id is registered to another account (user switched accounts on this phone): start a new camera identity. */
+    suspend fun rotateCameraId(): String {
+        val id = UUID.randomUUID().toString()
+        store.edit { it[K.cameraId] = id }
+        return id
+    }
+
     suspend fun updateCamera(transform: (CameraSettings) -> CameraSettings) = store.edit { p ->
         val cur = CameraSettings.fromJson(p[K.camera]?.let { runCatching { JSONObject(it) }.getOrNull() })
         p[K.camera] = transform(cur).copy(updatedAtMs = System.currentTimeMillis()).toJson().toString()

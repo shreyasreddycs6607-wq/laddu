@@ -192,6 +192,10 @@ class CameraMonitoringService : LifecycleService() {
         acquireLocks()
         cameraId = settings.cameraId()
         val ownerId = auth.currentUid ?: LOCAL_OWNER
+        if (ownerId != LOCAL_OWNER) { // the camera's devices/{id} record must exist before viewers' rules can resolve it
+            val name = "Laddu Camera (${Build.MANUFACTURER.replaceFirstChar { c -> c.uppercase() }} ${Build.MODEL})"
+            devices.ensureCamera(cameraId, ownerId, name) { settings.rotateCameraId() }.onSuccess { cameraId = it }
+        }
         current = settings.cameraSettings.first()
 
         engine = EventEngine(cameraId, ownerId, DetectionConfig.from(current))
