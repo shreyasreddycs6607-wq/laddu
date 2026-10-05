@@ -213,6 +213,8 @@ class CameraMonitoringService : LifecycleService() {
         }
         current = settings.cameraSettings.first()
 
+        // Events left "ongoing" by a killed process would stay open forever: close and re-sync them first.
+        if (dao.closeOngoing(System.currentTimeMillis()) > 0) processor.requestSync()
         engine = EventEngine(cameraId, ownerId, DetectionConfig.from(current))
         inputs = Channel(Channel.UNLIMITED)
         val emit: (EngineInput) -> Unit = { inputs.trySend(it) }

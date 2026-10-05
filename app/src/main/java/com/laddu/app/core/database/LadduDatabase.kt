@@ -75,7 +75,7 @@ interface EventDao {
 
     @Query("DELETE FROM events WHERE synced = 1 AND timestamp < :before") suspend fun deleteSyncedBefore(before: Long): Int
 
-    @Query("UPDATE events SET ongoing = 0 WHERE ongoing = 1") suspend fun closeOngoing(): Int
+    @Query("UPDATE events SET ongoing = 0, synced = 0, updatedAt = :now WHERE ongoing = 1") suspend fun closeOngoing(now: Long): Int
 
     @Query("DELETE FROM events") suspend fun clear()
 }
