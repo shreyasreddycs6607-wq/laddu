@@ -50,7 +50,7 @@ class TfliteDogDetectionEngine @Inject constructor(
         if (source == null) { _status.value = ModelStatus.MODEL_MISSING; return false }
         return try {
             val opts = ObjectDetector.ObjectDetectorOptions.builder()
-                .setMaxResults(5)
+                .setMaxResults(20) // a furnished room has many objects; a dog must not be cut off by the top-N
                 .setScoreThreshold(minConfidence)
                 .setBaseOptions(BaseOptions.builder().setNumThreads(threads).build())
                 .build()
