@@ -42,15 +42,23 @@ class CameraVideoFeeder(private val observer: CapturerObserver) : FrameConsumer 
     @Volatile var enabled = false
     @Volatile var maxFps = 15
     private var lastAt = 0L
+    private val lock = Any()
+    private var released = false
 
     override fun onFrame(image: ImageProxy) {
         if (!enabled) return
         val now = SystemClock.elapsedRealtime()
         if (now - lastAt < 1000L / maxFps - 4) return
         lastAt = now
-        val buffer = image.toI420()
-        val frame = VideoFrame(buffer, image.imageInfo.rotationDegrees, TimeUnit.MILLISECONDS.toNanos(now))
-        observer.onFrameCaptured(frame)
-        frame.release()
+        synchronized(lock) {
+            if (released) return // the VideoSource may already be disposed: never touch its observer after release()
+            val buffer = image.toI420()
+            val frame = VideoFrame(buffer, image.imageInfo.rotationDegrees, TimeUnit.MILLISECONDS.toNanos(now))
+            observer.onFrameCaptured(frame)
+            frame.release()
+        }
     }
+
+    /** Called before the VideoSource is disposed; waits for a frame that is mid-delivery. */
+    fun release() = synchronized(lock) { released = true }
 }

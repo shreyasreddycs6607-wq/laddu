@@ -177,7 +177,7 @@ class LiveStreamCoordinator @Inject constructor(
     @Synchronized
     private fun disposeMedia() {
         scope?.cancel(); scope = null
-        feeder?.let { it.enabled = false; cameraEngine.removeConsumer(it) }
+        feeder?.let { it.enabled = false; it.release(); cameraEngine.removeConsumer(it) }
         feeder = null
         webrtc.micSink = null
         runCatching { videoSource?.capturerObserver?.onCapturerStopped() }
