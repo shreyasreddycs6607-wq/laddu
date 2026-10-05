@@ -4,6 +4,7 @@ import android.content.Context
 import com.laddu.app.BuildConfig
 import com.laddu.app.core.firebase.FirebaseProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
+import com.laddu.app.core.firebase.awaitOrNull
 import kotlinx.coroutines.tasks.await
 import org.webrtc.DefaultVideoDecoderFactory
 import org.webrtc.DefaultVideoEncoderFactory
@@ -71,7 +72,7 @@ class IceServerProvider @Inject constructor(private val fb: FirebaseProvider) {
 
     private suspend fun fetchEphemeralTurn(): List<PeerConnection.IceServer>? = runCatching {
         if (!fb.isConfigured || fb.currentUid == null) return null
-        val data = fb.functions.getHttpsCallable("getTurnCredentials").call().await().getData() as? Map<*, *> ?: return null
+        val data = fb.functions.getHttpsCallable("getTurnCredentials").call().awaitOrNull(8_000)?.getData() as? Map<*, *> ?: return null
         val urls = (data["urls"] as? List<*>)?.mapNotNull { it as? String }.orEmpty()
         val user = data["username"] as? String ?: return null
         val cred = data["credential"] as? String ?: return null
