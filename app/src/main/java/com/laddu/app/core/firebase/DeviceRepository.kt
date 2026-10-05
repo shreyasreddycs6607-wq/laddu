@@ -235,6 +235,16 @@ class RemoteSettingsRepository @Inject constructor(private val fb: FirebaseProvi
         }
     }
 
+    /** Publishes the camera's own settings once so paired viewers can edit them; never overwrites existing ones. */
+    suspend fun ensure(cameraId: String, settings: CameraSettings) {
+        runCatching {
+            val ref = fb.firestore.collection(Paths.SETTINGS).document(cameraId)
+            if (ref.get().awaitOrNull()?.get("camera") == null) {
+                ref.set(mapOf("camera" to settings.toMap()), SetOptions.merge()).awaitDone()
+            }
+        }
+    }
+
     suspend fun push(cameraId: String, settings: CameraSettings): Result<Unit> = runCatching {
         fb.firestore.collection(Paths.SETTINGS).document(cameraId).set(
             mapOf("camera" to settings.copy(updatedAtMs = System.currentTimeMillis()).toMap()),

@@ -258,6 +258,7 @@ class CameraMonitoringService : LifecycleService() {
         }
         scope.launch {
             var baseline: Long? = null
+            if (auth.currentUid != null) remoteSettings.ensure(cameraId, current) // viewers need settings/{id}.camera to exist
             remoteSettings.observe(cameraId).collect { r ->
                 if (r == null) return@collect
                 val (remote, restartAt) = r
