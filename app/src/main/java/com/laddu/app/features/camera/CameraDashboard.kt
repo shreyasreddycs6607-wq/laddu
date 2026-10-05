@@ -161,11 +161,13 @@ fun CameraDashboardScreen(
         onDispose { owner.lifecycle.removeObserver(o) }
     }
     var askedOnce by remember { mutableStateOf(false) }
+    var startAfterGrant by remember { mutableStateOf(false) } // only START MONITORING may start monitoring, not "Grant permissions"
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         perms = PermissionState.read(ctx)
-        if (perms.canMonitor && it.isNotEmpty() && state.desired.not()) vm.start()
+        if (startAfterGrant && perms.canMonitor && it.isNotEmpty() && state.desired.not()) vm.start()
+        startAfterGrant = false
     }
-    val startRequested = { if (perms.canMonitor) vm.start() else { askedOnce = true; launcher.launch(perms.missing.toTypedArray()) } }
+    val startRequested = { if (perms.canMonitor) vm.start() else { askedOnce = true; startAfterGrant = true; launcher.launch(perms.missing.toTypedArray()) } }
 
     CameraDashboardContent(
         state = state,
@@ -173,7 +175,7 @@ fun CameraDashboardScreen(
         permanentlyDenied = askedOnce && !perms.camera,
         onStart = startRequested,
         onStop = vm::stop,
-        onGrant = { askedOnce = true; launcher.launch(perms.missing.toTypedArray()) },
+        onGrant = { askedOnce = true; startAfterGrant = false; launcher.launch(perms.missing.toTypedArray()) },
         onOpenAppSettings = { ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", ctx.packageName, null))) },
         onPairing = onPairing,
         onSettings = onSettings,
