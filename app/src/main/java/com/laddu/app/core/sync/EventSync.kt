@@ -15,6 +15,8 @@ import com.laddu.app.core.database.toModel
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import com.laddu.app.core.model.LadduEvent
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -39,26 +41,37 @@ class EventSyncManager @Inject constructor(
     private val dao: EventDao,
     private val remote: EventRemote,
 ) {
-    suspend fun syncPending(batchSize: Int = 50): SyncResult {
+    // One sync pass at a time: overlapping passes could write an older copy of a row over a newer one.
+    private val lock = Mutex()
+
+    suspend fun syncPending(batchSize: Int = 50): SyncResult = lock.withLock {
         var uploaded = 0
         var failed = 0
-        val batch = dao.unsynced(batchSize)
-        for (row in batch) {
-            val model = row.toModel()
-            if (model == null) { // unknown type from a future version: do not block the queue
-                dao.markSynced(row.eventId, row.updatedAt)
-                continue
-            }
-            if (remote.upload(model)) {
-                dao.markSynced(row.eventId, row.updatedAt)
-                uploaded++
-            } else {
-                failed++
-                break // network is down / not signed in: stop, retry later in order
+        var rounds = 0
+        while (failed == 0 && rounds++ < MAX_ROUNDS) { // drain a large offline backlog, not just the first batch
+            val batch = dao.unsynced(batchSize)
+            if (batch.isEmpty()) break
+            for (stale in batch) {
+                val row = dao.get(stale.eventId) ?: continue // re-read: it may have changed since the batch was read
+                if (row.synced) continue
+                val model = row.toModel()
+                if (model == null) { // unknown type from a future version: do not block the queue
+                    dao.markSynced(row.eventId, row.updatedAt)
+                    continue
+                }
+                if (remote.upload(model)) {
+                    dao.markSynced(row.eventId, row.updatedAt)
+                    uploaded++
+                } else {
+                    failed++
+                    break // network is down / not signed in: stop, retry later in order
+                }
             }
         }
-        return SyncResult(uploaded, failed)
+        SyncResult(uploaded, failed)
     }
+
+    private companion object { const val MAX_ROUNDS = 40 }
 }
 
 @HiltWorker
