@@ -135,8 +135,9 @@ class ViewerSession(
                             fire(LiveEvent.OfferReceived)
                             try {
                                 conn.setRemoteSuspend(SessionDescription(SessionDescription.Type.fromCanonicalForm(offer.type), offer.sdp))
-                                remoteSet = true
-                                synchronized(pendingRemote) { pendingRemote.forEach { conn.addIceCandidate(it) }; pendingRemote.clear() }
+                                // flip the flag and drain under the same lock the candidate path uses, so none is lost
+                                val queued = synchronized(pendingRemote) { remoteSet = true; pendingRemote.toList().also { pendingRemote.clear() } }
+                                queued.forEach { conn.addIceCandidate(it) }
                                 val answer = conn.createAnswerSuspend()
                                 conn.setLocalSuspend(answer)
                                 signaling.setAnswer(cameraId, sid, SessionDescriptionDoc(answer.type.canonicalForm(), answer.description))
@@ -150,7 +151,8 @@ class ViewerSession(
                 launch {
                     signaling.observeCandidates(cameraId, sid, fromCamera = true).collect { c ->
                         val ic = IceCandidate(c.sdpMid, c.sdpMLineIndex, c.candidate)
-                        if (remoteSet) conn.addIceCandidate(ic) else synchronized(pendingRemote) { pendingRemote += ic }
+                        val ready = synchronized(pendingRemote) { if (remoteSet) true else { pendingRemote += ic; false } }
+                        if (ready) conn.addIceCandidate(ic)
                     }
                 }
                 launch { // the camera never answered / never connected

@@ -42,7 +42,7 @@ class CameraPeer(
     private var videoSender: RtpSender? = null
     private val closed = AtomicBoolean(false)
     private val pendingRemote = ArrayList<IceCandidate>()
-    private var remoteSet = false
+    @Volatile private var remoteSet = false
     private var graceJob: Job? = null
 
     @Volatile var quality: StreamQuality = StreamQuality.MEDIUM
@@ -72,8 +72,9 @@ class CameraPeer(
                             try {
                                 conn.setRemoteSuspend(SessionDescription(SessionDescription.Type.fromCanonicalForm(doc.answer.type), doc.answer.sdp))
                             } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (t: Throwable) { close(); return@collect }
-                            remoteSet = true
-                            synchronized(pendingRemote) { pendingRemote.forEach { conn.addIceCandidate(it) }; pendingRemote.clear() }
+                            // flip the flag and drain under the same lock the candidate path uses, so none is lost
+                            val queued = synchronized(pendingRemote) { remoteSet = true; pendingRemote.toList().also { pendingRemote.clear() } }
+                            queued.forEach { conn.addIceCandidate(it) }
                         }
                         StreamQuality.entries.firstOrNull { it.name == doc.quality }?.let { requestedQuality = it }
                     }
@@ -81,7 +82,8 @@ class CameraPeer(
                 launch {
                     signaling.observeCandidates(cameraId, sessionId, fromCamera = false).collect { c ->
                         val ice = IceCandidate(c.sdpMid, c.sdpMLineIndex, c.candidate)
-                        if (remoteSet) conn.addIceCandidate(ice) else synchronized(pendingRemote) { pendingRemote += ice }
+                        val ready = synchronized(pendingRemote) { if (remoteSet) true else { pendingRemote += ice; false } }
+                        if (ready) conn.addIceCandidate(ice)
                     }
                 }
                 launch { // viewer never answered: free the slot
