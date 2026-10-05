@@ -114,6 +114,7 @@ class LiveViewModel @Inject constructor(
     private var cameraId: String? = null
     private var viewerId: String? = null
     private var cameraOnline = true
+    private var mobileOkOnce = false // "use mobile data this time" really is one time
     val eglContext get() = webrtc.eglBase.eglBaseContext
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -137,9 +138,10 @@ class LiveViewModel @Inject constructor(
         if (session != null && session!!.state.value != LiveState.FAILED && session!!.state.value != LiveState.ENDED) return
         viewModelScope.launch {
             val net = settings.networkSettings.first()
-            if (net.streamOnWifiOnly && !connectivity.isWifiNow()) { blocked.value = true; return@launch }
+            if (net.streamOnWifiOnly && !mobileOkOnce && !connectivity.isWifiNow()) { blocked.value = true; return@launch }
             blocked.value = false
-            val s = ViewerSession(cam, viewer, webrtc, ice, signaling) { false }.also {
+            val relay = net.forceRelay
+            val s = ViewerSession(cam, viewer, webrtc, ice, signaling) { relay }.also {
                 it.setMuted(muted.value)
             }
             session?.stop()
@@ -162,7 +164,7 @@ class LiveViewModel @Inject constructor(
     }
 
     fun allowOnMobileData() {
-        viewModelScope.launch { settings.updateNetwork { it.copy(streamOnWifiOnly = false) }; blocked.value = false; connect() }
+        mobileOkOnce = true; blocked.value = false; connect()
     }
 
     override fun onCleared() { stop() }
