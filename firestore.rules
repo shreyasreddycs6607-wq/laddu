@@ -63,7 +63,10 @@ service cloud.firestore {
              == request.resource.data.cameraId
         && get(/databases/$(database)/documents/pairingSessions/$(request.resource.data.pairingToken)).data.used == false
         && get(/databases/$(database)/documents/pairingSessions/$(request.resource.data.pairingToken)).data.expiresAt
-             > request.time;
+             > request.time
+        // single use: the same batch must also mark the token used by this account (what redeem() does)
+        && getAfter(/databases/$(database)/documents/pairingSessions/$(request.resource.data.pairingToken)).data.used == true
+        && getAfter(/databases/$(database)/documents/pairingSessions/$(request.resource.data.pairingToken)).data.usedBy == uid();
       // Owner revokes a viewer, or a viewer removes themselves.
       allow delete: if signedIn() && (resource.data.userId == uid() || isOwner(resource.data.cameraId));
     }
