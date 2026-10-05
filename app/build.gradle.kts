@@ -135,7 +135,6 @@ dependencies {
 
     implementation(libs.tflite)
     implementation(libs.tflite.task.vision)
-    implementation(libs.tflite.task.audio)
 
     implementation(libs.webrtc)
     implementation(libs.zxing.core)

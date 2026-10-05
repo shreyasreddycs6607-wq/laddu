@@ -90,6 +90,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -122,7 +123,7 @@ data class CameraDashboardState(
 
 @HiltViewModel
 class CameraDashboardViewModel @Inject constructor(
-    holder: MonitoringStateHolder,
+    private val holder: MonitoringStateHolder,
     private val settings: SettingsRepository,
     private val controller: MonitoringController,
     auth: AuthRepository,
@@ -133,6 +134,9 @@ class CameraDashboardViewModel @Inject constructor(
         combine(holder.ui, settings.monitoringDesired, settings.localOnly) { m, d, local ->
             CameraDashboardState(m, d, cloudEnabled = !local)
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CameraDashboardState())
+
+    // The OS may have killed the process (crash, OEM cleanup); monitoring was still wanted, so bring it back.
+    init { viewModelScope.launch { if (settings.monitoringDesired.first() && !holder.ui.value.running) controller.start() } }
 
     fun start() { viewModelScope.launch { controller.start() } }
     fun stop() { viewModelScope.launch { controller.stop() } }

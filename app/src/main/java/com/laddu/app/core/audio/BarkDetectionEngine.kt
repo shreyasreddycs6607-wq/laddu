@@ -8,9 +8,9 @@ import com.laddu.app.core.ai.ModelStatus
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import org.tensorflow.lite.support.audio.TensorAudio
-import org.tensorflow.lite.task.audio.classifier.AudioClassifier
-import org.tensorflow.lite.task.core.BaseOptions
+import org.tensorflow.lite.Interpreter
+import java.io.FileInputStream
+import java.nio.channels.FileChannel
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -50,6 +50,10 @@ interface BarkDetectionEngine {
     fun close()
 }
 
+/**
+ * YAMNet through the plain TFLite [Interpreter]. (The Task Audio native library aborts with a Scudo
+ * "misaligned pointer" on some Android 12 devices, which no try/catch can survive.)
+ */
 @Singleton
 class TfliteBarkDetectionEngine @Inject constructor(
     @ApplicationContext private val ctx: Context,
@@ -58,32 +62,38 @@ class TfliteBarkDetectionEngine @Inject constructor(
     private val _status = MutableStateFlow(ModelStatus.NOT_LOADED)
     override val status: StateFlow<ModelStatus> = _status
 
-    private var classifier: AudioClassifier? = null
-    private var tensor: TensorAudio? = null
+    private var interpreter: Interpreter? = null
+    private var labels: List<SoundClass> = emptyList()
+    private var input = FloatArray(0)
+    private var output = arrayOf(FloatArray(0))
 
     @Volatile override var windowSamples: Int = 15_600; private set
     @Volatile override var sampleRate: Int = 16_000; private set
 
     @Synchronized
     override fun load(): Boolean {
-        if (classifier != null) return true
+        if (interpreter != null) return true
         val source = ModelLocator.locate(ctx, ModelNames.AUDIO)
         if (source == null) { _status.value = ModelStatus.MODEL_MISSING; return false }
         return try {
-            val opts = AudioClassifier.AudioClassifierOptions.builder()
-                .setBaseOptions(BaseOptions.builder().setNumThreads(1).build())
-                .setMaxResults(15)
-                .setScoreThreshold(0.05f)
-                .build()
-            val c = when (source) {
-                is ModelSource.InFile -> AudioClassifier.createFromFileAndOptions(source.file, opts)
-                is ModelSource.InAssets -> AudioClassifier.createFromFileAndOptions(ctx, source.path, opts)
+            val opts = Interpreter.Options().setNumThreads(1)
+            val it = when (source) {
+                is ModelSource.InFile -> FileInputStream(source.file).use { f ->
+                    Interpreter(f.channel.map(FileChannel.MapMode.READ_ONLY, 0, f.channel.size()), opts)
+                }
+                is ModelSource.InAssets -> ctx.assets.openFd(source.path).use { fd ->
+                    FileInputStream(fd.fileDescriptor).channel.map(FileChannel.MapMode.READ_ONLY, fd.startOffset, fd.declaredLength)
+                        .let { Interpreter(it, opts) }
+                }
             }
-            classifier = c
-            tensor = c.createInputTensorAudio()
-            val fmt = c.requiredTensorAudioFormat
-            sampleRate = fmt.sampleRate
-            windowSamples = (tensor!!.tensorBuffer.flatSize / fmt.channels)
+            labels = ctx.assets.open("models/bark_labels.txt").bufferedReader().readLines()
+                .filter { it.isNotBlank() }.map { soundClassOf(it.trim()) }
+            windowSamples = it.getInputTensor(0).shape().last()
+            val classes = it.getOutputTensor(0).shape().last()
+            check(classes == labels.size) { "label count $classes != ${labels.size}" }
+            input = FloatArray(windowSamples)
+            output = arrayOf(FloatArray(classes))
+            interpreter = it
             _status.value = ModelStatus.READY
             true
         } catch (t: Throwable) {
@@ -94,20 +104,22 @@ class TfliteBarkDetectionEngine @Inject constructor(
 
     @Synchronized
     override fun classify(window: ShortArray, timestampMs: Long): AudioClassification? {
-        val c = classifier ?: return null
-        val t = tensor ?: return null
-        t.load(window, 0, minOf(window.size, windowSamples))
+        val it = interpreter ?: return null
+        val n = minOf(window.size, windowSamples)
+        for (i in 0 until n) input[i] = window[i] / 32768f
+        for (i in n until windowSamples) input[i] = 0f
+        it.run(input, output)
         val best = HashMap<SoundClass, Float>()
-        for (cls in c.classify(t)) for (cat in cls.categories) {
-            val sc = soundClassOf(cat.label)
-            if (cat.score > (best[sc] ?: 0f)) best[sc] = cat.score
+        output[0].forEachIndexed { i, sc ->
+            val cls = labels[i]
+            if (sc > 0.05f && sc > (best[cls] ?: 0f)) best[cls] = sc
         }
         return AudioClassification(timestampMs, best)
     }
 
     @Synchronized
     override fun close() {
-        classifier?.close(); classifier = null; tensor = null
+        interpreter?.close(); interpreter = null
         _status.value = ModelStatus.NOT_LOADED
     }
 }

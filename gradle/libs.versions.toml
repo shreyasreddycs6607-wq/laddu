@@ -84,7 +84,6 @@ camerax-view = { module = "androidx.camera:camera-view", version.ref = "camerax"
 
 tflite = { module = "org.tensorflow:tensorflow-lite", version.ref = "tflite" }
 tflite-task-vision = { module = "org.tensorflow:tensorflow-lite-task-vision", version.ref = "tfliteTask" }
-tflite-task-audio = { module = "org.tensorflow:tensorflow-lite-task-audio", version.ref = "tfliteTask" }
 
 webrtc = { module = "io.github.webrtc-sdk:android", version.ref = "webrtc" }
 zxing-core = { module = "com.google.zxing:core", version.ref = "zxingCore" }
