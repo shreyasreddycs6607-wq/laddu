@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -75,6 +76,16 @@ class ViewerViewModel @Inject constructor(
             selected = cams.firstOrNull { it.cameraId == selId } ?: cams.firstOrNull(),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ViewerState())
+
+    // Home falls back to the first camera when nothing is selected; persist that so Settings/Manage agree with it.
+    init {
+        viewModelScope.launch {
+            state.collect { s ->
+                val id = s.selected?.cameraId
+                if (id != null && id != settings.selectedCameraId.first()) settings.setSelectedCamera(id)
+            }
+        }
+    }
 
     fun select(id: String) { viewModelScope.launch { settings.setSelectedCamera(id) } }
 
