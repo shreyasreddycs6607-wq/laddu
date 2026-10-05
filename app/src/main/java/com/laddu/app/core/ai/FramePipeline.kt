@@ -55,8 +55,8 @@ class FramePipeline(
         val possible = motionFresh && lastMotion.score >= MOTION_THRESHOLD
         val due = now - lastInferenceAt >= p.intervalMs
 
-        if (!s.dogDetection) {
-            // Dog AI off: fall back to plain motion (not dog-specific) at the AI cadence.
+        if (!s.dogDetection || dog.status.value != com.laddu.app.core.ai.ModelStatus.READY) {
+            // Dog AI off, missing or failed to load: fall back to plain motion (not dog-specific) at the AI cadence.
             if (due) { lastInferenceAt = now; emit(EngineInput.MovementSample(now, possible, lastMotion.score)) }
             return
         }
