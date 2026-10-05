@@ -84,17 +84,22 @@ fun ViewerShell(
 
     // Alerts need the notification permission on Android 13+.
     val askNotif = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    var askedNotif by rememberSaveable { mutableStateOf(false) } // ask once, not on every return to the shell
     LaunchedEffect(Unit) {
-        if (Build.VERSION.SDK_INT >= 33 &&
+        if (!askedNotif && Build.VERSION.SDK_INT >= 33 &&
             ContextCompat.checkSelfPermission(ctx, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-        ) askNotif.launch(Manifest.permission.POST_NOTIFICATIONS)
+        ) { askedNotif = true; askNotif.launch(Manifest.permission.POST_NOTIFICATIONS) }
     }
 
     // A tap on a push notification (or "VIEW LIVE") lands here.
     LaunchedEffect(link) {
         val l = link ?: return@LaunchedEffect
         tabs.currentBackStackEntryFlow.first() // the inner NavHost has no graph until its first composition
-        l.cameraId?.let { vm.select(it) }
+        // select is an async write: wait for it so Live does not first connect to the previously selected camera
+        l.cameraId?.let { id ->
+            vm.select(id)
+            kotlinx.coroutines.withTimeoutOrNull(2_000) { vm.state.first { it.selected?.cameraId == id } }
+        }
         vm.consumeLink()
         when {
             l.openLive -> tabs.navigateTab(Routes.VIEWER_LIVE)
