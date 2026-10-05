@@ -454,7 +454,7 @@ class CameraMonitoringService : LifecycleService() {
                 runCatching { devices.heartbeat(cameraId, currentStatus(false)) }
             }
             teardown()
-            holder.reset()
+            holder.update { MonitorUi(error = it.error) } // keep a failure message visible after the shutdown
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
