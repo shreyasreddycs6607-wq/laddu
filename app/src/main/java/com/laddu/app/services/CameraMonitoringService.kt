@@ -275,12 +275,16 @@ class CameraMonitoringService : LifecycleService() {
         }
         scope.launch {
             var baseline: Long? = null
+            var lastRemote = -1L // compare stamps, not clocks: the camera's and the viewer's clocks differ
             if (auth.currentUid != null) remoteSettings.ensure(cameraId, current) // viewers need settings/{id}.camera to exist
             remoteSettings.observe(cameraId).collect { r ->
                 if (r == null) return@collect
                 val (remote, restartAt) = r
                 if (baseline == null) baseline = restartAt
-                if (remote.updatedAtMs > current.updatedAtMs) settings.applyRemoteCamera(remote)
+                if (remote.updatedAtMs != lastRemote && remote.updatedAtMs != current.updatedAtMs) {
+                    lastRemote = remote.updatedAtMs
+                    settings.applyRemoteCamera(remote)
+                }
                 if (restartAt > (baseline ?: 0L)) { baseline = restartAt; restartSession() }
             }
         }
