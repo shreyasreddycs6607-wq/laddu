@@ -218,7 +218,11 @@ fun LiveContent(
     Column(modifier.fillMaxSize().background(if (fullscreen) Color.Black else MaterialTheme.colorScheme.background).testTag("live_screen")) {
         if (!fullscreen) {
             Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text(cameraName.ifBlank { "Live" }, style = MaterialTheme.typography.titleLarge)
+                Text(
+                    cameraName.ifBlank { "Live" }, style = MaterialTheme.typography.titleLarge,
+                    maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).padding(end = 12.dp), // a long camera name must not push the state pill off screen
+                )
                 StatusPill(stateLabel(ui.state), stateTone(ui.state), Modifier.testTag("live_state"))
             }
         }
