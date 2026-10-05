@@ -34,6 +34,11 @@ class RootViewModel @Inject constructor(
     val route: StateFlow<String?> = combine(settings.appMode, auth.authState, settings.localOnly, ::resolveRoute)
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
+    // A sign-in means cloud mode; drop a stale "continue without cloud" choice made before Firebase was set up.
+    init {
+        viewModelScope.launch { auth.authState.collect { if (it is AuthState.SignedIn) settings.setLocalOnly(false) } }
+    }
+
     fun continueLocally() {
         viewModelScope.launch { settings.setLocalOnly(true) }
     }
