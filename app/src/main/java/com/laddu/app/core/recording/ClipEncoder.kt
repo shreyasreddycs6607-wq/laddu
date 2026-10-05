@@ -21,7 +21,8 @@ object ClipEncoder {
     fun encode(frames: List<ClipFrame>, out: File, bitRate: Int = 700_000): Boolean {
         if (frames.size < 2) return false
         val first = BitmapFactory.decodeByteArray(frames[0].jpeg, 0, frames[0].jpeg.size) ?: return false
-        val w = first.width and 1.inv(); val h = first.height and 1.inv()
+        // H.264 encoders want 16-aligned macroblocks; odd sizes are rejected or corrupted on some phones.
+        val w = first.width and 15.inv(); val h = first.height and 15.inv()
         first.recycle()
         if (w <= 0 || h <= 0) return false
 
@@ -45,10 +46,11 @@ object ClipEncoder {
 
             fun drain(endOfStream: Boolean) {
                 val c = codec!!
+                val deadline = System.nanoTime() + 3_000_000_000L
                 while (true) {
                     val idx = c.dequeueOutputBuffer(info, if (endOfStream) TIMEOUT_US else 0)
                     when {
-                        idx == MediaCodec.INFO_TRY_AGAIN_LATER -> if (!endOfStream) return
+                        idx == MediaCodec.INFO_TRY_AGAIN_LATER -> if (!endOfStream || System.nanoTime() > deadline) return
                         idx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                             track = muxer!!.addTrack(c.outputFormat); muxer!!.start(); muxerStarted = true
                         }
@@ -87,11 +89,16 @@ object ClipEncoder {
                 bmp.recycle()
                 drain(false)
             }
-            val eos = codec.dequeueInputBuffer(TIMEOUT_US)
-            if (eos >= 0) codec.queueInputBuffer(eos, 0, 0, lastUs + 1000, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+            // Every input buffer may still be busy right after the last frame: keep draining until one frees up.
+            var eos = -1
+            var tries = 0
+            while (eos < 0 && tries++ < 100) { eos = codec.dequeueInputBuffer(TIMEOUT_US); if (eos < 0) drain(false) }
+            if (eos < 0) error("encoder never accepted end-of-stream")
+            codec.queueInputBuffer(eos, 0, 0, lastUs + 1000, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
             drain(true)
             muxerStarted
         } catch (t: Throwable) {
+            runCatching { out.delete() } // never leave a partial MP4 behind
             false
         } finally {
             runCatching { codec?.stop() }; runCatching { codec?.release() }
