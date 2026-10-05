@@ -62,6 +62,7 @@ class TfliteDogDetectionEngine @Inject constructor(
             _status.value = ModelStatus.READY
             true
         } catch (t: Throwable) {
+            android.util.Log.w("Laddu", "dog model failed to load", t)
             _status.value = ModelStatus.ERROR
             false
         }
