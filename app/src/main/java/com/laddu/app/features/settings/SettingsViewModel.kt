@@ -62,6 +62,7 @@ class SettingsViewModel @Inject constructor(
     health: DeviceHealthMonitor,
     private val clips: ClipRecorder,
     private val controller: MonitoringController,
+    private val monitor: com.laddu.app.services.MonitoringStateHolder,
     fb: FirebaseProvider,
 ) : ViewModel() {
 
@@ -124,6 +125,8 @@ class SettingsViewModel @Inject constructor(
     fun signOut(onDone: () -> Unit) {
         viewModelScope.launch {
             runCatching { controller.stop() }
+            // let the service send its final "stopped" heartbeat while we are still signed in
+            kotlinx.coroutines.withTimeoutOrNull(5_000) { monitor.ui.first { !it.running && !it.starting } }
             auth.signOut()
             settings.clearUserData()
             onDone()
