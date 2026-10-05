@@ -208,7 +208,7 @@ class CameraMonitoringService : LifecycleService() {
         cameraId = settings.cameraId()
         val ownerId = auth.currentUid ?: LOCAL_OWNER
         if (ownerId != LOCAL_OWNER) { // the camera's devices/{id} record must exist before viewers' rules can resolve it
-            val name = "Laddu Camera (${Build.MANUFACTURER.replaceFirstChar { c -> c.uppercase() }} ${Build.MODEL})"
+            val name = com.laddu.app.core.firebase.defaultCameraName()
             devices.ensureCamera(cameraId, ownerId, name) { settings.rotateCameraId() }.onSuccess { cameraId = it }
         }
         current = settings.cameraSettings.first()
@@ -281,7 +281,11 @@ class CameraMonitoringService : LifecycleService() {
                 if (r == null) return@collect
                 val (remote, restartAt) = r
                 if (baseline == null) baseline = restartAt
-                if (remote.updatedAtMs != lastRemote && remote.updatedAtMs != current.updatedAtMs) {
+                if (lastRemote == -1L) {
+                    // first snapshot: the stored copy may simply be older than what this phone already has
+                    lastRemote = remote.updatedAtMs
+                    if (remote.updatedAtMs > current.updatedAtMs) settings.applyRemoteCamera(remote)
+                } else if (remote.updatedAtMs != lastRemote && remote.updatedAtMs != current.updatedAtMs) {
                     lastRemote = remote.updatedAtMs
                     settings.applyRemoteCamera(remote)
                 }
