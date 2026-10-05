@@ -17,6 +17,7 @@ import com.laddu.app.features.activity.DayStats
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -26,6 +27,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -66,13 +68,23 @@ class ViewerViewModel @Inject constructor(
         .map { (it as? AuthState.SignedIn)?.user }
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
-    val state: StateFlow<ViewerState> = combine(
-        user.flatMapLatest { u -> if (u == null) flowOf(null to emptyList()) else devices.observeAccessibleCameras(u.uid).map { u to it } },
-        settings.selectedCameraId,
-        clock,
-    ) { (u, cams), selId, now ->
+    // cameras == null means "not loaded yet" (auth unresolved or first Firestore snapshot pending), so Home shows
+    // a loader instead of flashing "No camera yet".
+    private val accessible: Flow<Pair<UserProfile?, List<CameraInfo>?>> = auth.authState.flatMapLatest { a ->
+        when (a) {
+            is AuthState.SignedIn ->
+                devices.observeAccessibleCameras(a.user.uid)
+                    .map<List<CameraInfo>, Pair<UserProfile?, List<CameraInfo>?>> { a.user to it }
+                    .onStart { emit(a.user to null) }
+            is AuthState.Unknown -> flowOf(null to null)
+            else -> flowOf(null to emptyList())
+        }
+    }
+
+    val state: StateFlow<ViewerState> = combine(accessible, settings.selectedCameraId, clock) { (u, loaded), selId, now ->
+        val cams = loaded.orEmpty()
         ViewerState(
-            loading = false, user = u, cameras = cams, nowMs = now,
+            loading = loaded == null, user = u, cameras = cams, nowMs = now,
             selected = cams.firstOrNull { it.cameraId == selId } ?: cams.firstOrNull(),
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ViewerState())
