@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -77,12 +78,12 @@ class FirebaseAuthRepository @Inject constructor(
             ),
             com.google.firebase.firestore.SetOptions.merge(),
         ).awaitOrNull()
-        runCatching { fcm.registerToken() } // push is optional: never fail the account flow
+        withTimeoutOrNull(4_000) { runCatching { fcm.registerToken() } } // push is optional: never fail or stall the account flow
     }
 
     override suspend fun signIn(email: String, password: String): Result<Unit> = runCatching {
         fb.auth.signInWithEmailAndPassword(email.trim(), password).await()
-        runCatching { fcm.registerToken() }
+        withTimeoutOrNull(4_000) { runCatching { fcm.registerToken() } }
     }
 
     override suspend fun resetPassword(email: String): Result<Unit> = runCatching {
@@ -91,7 +92,7 @@ class FirebaseAuthRepository @Inject constructor(
 
     override suspend fun signOut() {
         if (!fb.isConfigured) return
-        runCatching { fcm.unregisterToken() }
+        withTimeoutOrNull(4_000) { runCatching { fcm.unregisterToken() } } // offline logout must not hang
         fb.auth.signOut()
     }
 }
