@@ -15,6 +15,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import org.webrtc.AudioTrack
 import org.webrtc.IceCandidate
 import org.webrtc.PeerConnection
@@ -35,7 +36,7 @@ class ViewerSession(
     private val signaling: SignalingRepository,
     private val forceRelay: () -> Boolean,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + kotlinx.coroutines.CoroutineExceptionHandler { _, _ -> if (!stopped) fire(LiveEvent.IceFailed) })
     private val sm = LiveSessionStateMachine()
 
     private val _state = MutableStateFlow(LiveState.IDLE)
@@ -48,6 +49,8 @@ class ViewerSession(
     private var pc: PeerConnection? = null
     private var sessionId: String? = null
     private var attempt: Job? = null
+    private var reconnectJob: Job? = null
+    private val beginLock = kotlinx.coroutines.sync.Mutex()
     private var graceJob: Job? = null
     private var audio: AudioTrack? = null
     private var muted = false
@@ -70,30 +73,39 @@ class ViewerSession(
         scope.launch { signaling.setQuality(cameraId, sid, q.name) }
     }
 
-    fun reconnect() = apply(sm.onEvent(LiveEvent.UserReconnect))
+    fun reconnect() = fire(LiveEvent.UserReconnect)
 
     fun stop() {
         stopped = true
-        apply(sm.onEvent(LiveEvent.UserStop)) // tears down synchronously
+        fire(LiveEvent.UserStop) // tears down synchronously
         scope.cancel()
     }
 
-    fun cameraOffline() = apply(sm.onEvent(LiveEvent.CameraOffline))
+    fun cameraOffline() = fire(LiveEvent.CameraOffline)
+
+    /** All state-machine access goes through here: events arrive from the signaling, main and Default threads. */
+    private fun fire(e: LiveEvent) { synchronized(sm) { apply(sm.onEvent(e)) } }
 
     private fun apply(step: LiveStep) {
         _state.value = step.state
         _message.value = step.message
         when (val a = step.action) {
-            is LiveAction.Reconnect -> if (!stopped) scope.launch { delay(a.delayMs); if (!stopped) begin() }
-            LiveAction.Teardown -> teardown(endSession = true)
+            is LiveAction.Reconnect -> if (!stopped) {
+                reconnectJob?.cancel() // one failure can raise several events; only the latest reconnect may run
+                reconnectJob = scope.launch { delay(a.delayMs); if (!stopped) begin() }
+            }
+            // off the native callback thread unless we are being stopped (stop() runs on main and must be synchronous)
+            LiveAction.Teardown -> if (stopped) teardown(endSession = true) else scope.launch { teardown(endSession = true) }
             LiveAction.None -> Unit
         }
     }
 
-    private suspend fun begin() {
+    private suspend fun begin() = beginLock.withLock { beginLocked() }
+
+    private suspend fun beginLocked() {
         teardown(endSession = true)
         if (stopped) return
-        apply(sm.onEvent(LiveEvent.RequestSent))
+        fire(LiveEvent.RequestSent)
         try {
             val servers = ice.servers()
             val cfg = ice.rtcConfig(servers, forceRelay())
@@ -111,22 +123,27 @@ class ViewerSession(
                     signaling.observeSession(cameraId, sid).collect { doc ->
                         if (doc == null) {
                             // the camera deleted the session (it closed the peer) or we lost access
-                            if (seen && !stopped) apply(sm.onEvent(LiveEvent.IceFailed))
+                            if (seen && !stopped) fire(LiveEvent.IceFailed)
                             return@collect
                         }
                         seen = true
-                        if (doc.state == SessionState.FAILED) { apply(sm.onEvent(LiveEvent.Timeout)); return@collect }
-                        if (doc.state == SessionState.ENDED && !stopped) { apply(sm.onEvent(LiveEvent.IceFailed)); return@collect }
+                        if (doc.state == SessionState.FAILED) { fire(LiveEvent.Timeout); return@collect }
+                        if (doc.state == SessionState.ENDED && !stopped) { fire(LiveEvent.IceFailed); return@collect }
                         val offer = doc.offer
                         if (!offerHandled && offer != null) {
                             offerHandled = true
-                            apply(sm.onEvent(LiveEvent.OfferReceived))
-                            conn.setRemoteSuspend(SessionDescription(SessionDescription.Type.fromCanonicalForm(offer.type), offer.sdp))
-                            remoteSet = true
-                            synchronized(pendingRemote) { pendingRemote.forEach { conn.addIceCandidate(it) }; pendingRemote.clear() }
-                            val answer = conn.createAnswerSuspend()
-                            conn.setLocalSuspend(answer)
-                            signaling.setAnswer(cameraId, sid, SessionDescriptionDoc(answer.type.canonicalForm(), answer.description))
+                            fire(LiveEvent.OfferReceived)
+                            try {
+                                conn.setRemoteSuspend(SessionDescription(SessionDescription.Type.fromCanonicalForm(offer.type), offer.sdp))
+                                remoteSet = true
+                                synchronized(pendingRemote) { pendingRemote.forEach { conn.addIceCandidate(it) }; pendingRemote.clear() }
+                                val answer = conn.createAnswerSuspend()
+                                conn.setLocalSuspend(answer)
+                                signaling.setAnswer(cameraId, sid, SessionDescriptionDoc(answer.type.canonicalForm(), answer.description))
+                            } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (t: Throwable) {
+                                android.util.Log.w("Laddu", "viewer answer failed", t)
+                                if (!stopped) fire(LiveEvent.IceFailed)
+                            }
                         }
                     }
                 }
@@ -138,12 +155,12 @@ class ViewerSession(
                 }
                 launch { // the camera never answered / never connected
                     delay(30_000)
-                    if (_state.value == LiveState.REQUESTING || _state.value == LiveState.CONNECTING) apply(sm.onEvent(LiveEvent.Timeout))
+                    if (_state.value == LiveState.REQUESTING || _state.value == LiveState.CONNECTING) fire(LiveEvent.Timeout)
                 }
             }
         } catch (t: Throwable) {
             android.util.Log.w("Laddu", "viewer session failed", t)
-            apply(sm.onEvent(LiveEvent.Timeout))
+            fire(LiveEvent.Timeout)
         }
     }
 
@@ -158,14 +175,14 @@ class ViewerSession(
             android.util.Log.i("Laddu", "viewer ice state: $s")
             when (s) {
                 PeerConnection.IceConnectionState.CONNECTED, PeerConnection.IceConnectionState.COMPLETED -> {
-                    graceJob?.cancel(); apply(sm.onEvent(LiveEvent.IceConnected))
+                    graceJob?.cancel(); fire(LiveEvent.IceConnected)
                 }
                 PeerConnection.IceConnectionState.DISCONNECTED -> {
-                    apply(sm.onEvent(LiveEvent.IceDisconnected))
+                    fire(LiveEvent.IceDisconnected)
                     graceJob?.cancel()
-                    graceJob = scope.launch { delay(8_000); apply(sm.onEvent(LiveEvent.DisconnectGraceExpired)) }
+                    graceJob = scope.launch { delay(8_000); fire(LiveEvent.DisconnectGraceExpired) }
                 }
-                PeerConnection.IceConnectionState.FAILED -> { graceJob?.cancel(); apply(sm.onEvent(LiveEvent.IceFailed)) }
+                PeerConnection.IceConnectionState.FAILED -> { graceJob?.cancel(); fire(LiveEvent.IceFailed) }
                 else -> Unit
             }
         }

@@ -36,7 +36,8 @@ class CameraPeer(
     private val signaling: SignalingRepository,
     private val onClosed: (CameraPeer) -> Unit,
 ) {
-    private val scope = CoroutineScope(SupervisorJob() + kotlinx.coroutines.Dispatchers.Default)
+    // An uncaught failure in any child must end this peer, not crash the camera service.
+    private val scope = CoroutineScope(SupervisorJob() + kotlinx.coroutines.Dispatchers.Default + kotlinx.coroutines.CoroutineExceptionHandler { _, _ -> close() })
     private var pc: PeerConnection? = null
     private var videoSender: RtpSender? = null
     private val closed = AtomicBoolean(false)
@@ -68,7 +69,9 @@ class CameraPeer(
                     signaling.observeSession(cameraId, sessionId).collect { doc ->
                         if (doc == null || doc.state == SessionState.ENDED || doc.state == SessionState.FAILED) { close(); return@collect }
                         if (!remoteSet && doc.answer != null) {
-                            conn.setRemoteSuspend(SessionDescription(SessionDescription.Type.fromCanonicalForm(doc.answer.type), doc.answer.sdp))
+                            try {
+                                conn.setRemoteSuspend(SessionDescription(SessionDescription.Type.fromCanonicalForm(doc.answer.type), doc.answer.sdp))
+                            } catch (e: kotlinx.coroutines.CancellationException) { throw e } catch (t: Throwable) { close(); return@collect }
                             remoteSet = true
                             synchronized(pendingRemote) { pendingRemote.forEach { conn.addIceCandidate(it) }; pendingRemote.clear() }
                         }
@@ -108,7 +111,8 @@ class CameraPeer(
                     graceJob?.cancel()
                     graceJob = scope.launch { delay(15_000); close() } // viewer reconnects with a fresh session
                 }
-                PeerConnection.IceConnectionState.FAILED, PeerConnection.IceConnectionState.CLOSED -> close()
+                // never close/dispose from inside the native callback
+                PeerConnection.IceConnectionState.FAILED, PeerConnection.IceConnectionState.CLOSED -> scope.launch { close() }
                 else -> Unit
             }
         }
