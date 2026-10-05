@@ -27,8 +27,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -82,14 +84,19 @@ class SettingsViewModel @Inject constructor(
     }
     private val rest = combine(settings.recordingSettings, settings.networkSettings, health.health.onStart { emit(DeviceHealth()) }) { r, n, h -> Rest(r, n, h) }
 
-    val ui: StateFlow<SettingsUi> = combine(base, rest, remoteCamera) { b, r, rc ->
+    // clip storage is read off the main thread and only when it can change, not on every battery/thermal update
+    private val usedMb = MutableStateFlow(0L)
+    private fun refreshUsedMb() { viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) { usedMb.value = clips.usedBytes() / (1024 * 1024) } }
+    init { refreshUsedMb() }
+
+    val ui: StateFlow<SettingsUi> = combine(base, rest, remoteCamera, usedMb) { b, r, rc, used ->
         val viewer = b.mode == AppMode.VIEWER
         SettingsUi(
             mode = b.mode, email = b.email, theme = b.theme,
             camera = if (viewer) (rc?.second?.first ?: CameraSettings()) else b.local,
             notif = b.notif, recording = r.rec, network = r.net,
             remoteCameraName = rc?.third?.name, remoteReady = viewer && rc?.second != null,
-            storageUsedMb = clips.usedBytes() / (1024 * 1024),
+            storageUsedMb = used,
             health = r.health, firebaseConfigured = fb.isConfigured,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUi())
@@ -114,7 +121,7 @@ class SettingsViewModel @Inject constructor(
     fun updateRecording(transform: (RecordingSettings) -> RecordingSettings) { viewModelScope.launch { settings.updateRecording(transform) } }
     fun updateNetwork(transform: (NetworkSettings) -> NetworkSettings) { viewModelScope.launch { settings.updateNetwork(transform) } }
     fun setTheme(t: ThemeChoice) { viewModelScope.launch { settings.setTheme(t) } }
-    fun deleteRecordings() { viewModelScope.launch { clips.deleteAll() } }
+    fun deleteRecordings() { viewModelScope.launch { withContext(kotlinx.coroutines.Dispatchers.IO) { clips.deleteAll() }; refreshUsedMb() } }
 
     fun restartRemoteCamera() {
         viewModelScope.launch { settings.selectedCameraId.first()?.let { remote.requestRestart(it) } }
