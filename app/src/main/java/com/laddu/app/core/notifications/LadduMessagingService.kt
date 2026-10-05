@@ -5,12 +5,10 @@ import com.google.firebase.messaging.RemoteMessage
 import com.laddu.app.core.datastore.SettingsRepository
 import com.laddu.app.core.firebase.FcmTokenManager
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import com.laddu.app.core.model.AppMode
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import javax.inject.Inject
 
 /**
@@ -24,19 +22,20 @@ class LadduMessagingService : FirebaseMessagingService() {
     @Inject lateinit var helper: NotificationHelper
     @Inject lateinit var policy: NotificationPolicy
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-
+    // Both callbacks already run on FCM's background executor and the service stops as soon as they return,
+    // so the work must finish inside them (a launched coroutine would be cancelled in onDestroy).
     override fun onNewToken(token: String) {
-        scope.launch { runCatching { tokens.registerToken(token) } }
+        runBlocking { withTimeoutOrNull(10_000) { runCatching { tokens.registerToken(token) } } }
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
         val payload = AlertPayload.fromData(message.data) ?: return
-        scope.launch {
-            val prefs = settings.notificationPrefs.first()
-            if (policy.shouldShow(payload, prefs, System.currentTimeMillis())) helper.showAlert(payload)
+        runBlocking {
+            withTimeoutOrNull(8_000) {
+                if (settings.appMode.first() == AppMode.CAMERA) return@withTimeoutOrNull // the camera phone is not an alert viewer
+                val prefs = settings.notificationPrefs.first()
+                if (policy.shouldShow(payload, prefs, System.currentTimeMillis())) helper.showAlert(payload)
+            }
         }
     }
-
-    override fun onDestroy() { scope.cancel(); super.onDestroy() }
 }
