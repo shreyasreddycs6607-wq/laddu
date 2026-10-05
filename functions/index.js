@@ -163,5 +163,11 @@ exports.getTurnCredentials = onCall({ secrets: [TURN_SECRET] }, async (request) 
 exports.cleanupStaleSessions = onSchedule("every 60 minutes", async () => {
   const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - 10 * 60 * 1000);
   const old = await db.collectionGroup("liveSessions").where("createdAt", "<", cutoff).get();
-  await Promise.all(old.docs.map((d) => db.recursiveDelete(d.ref)));
+  // A connected stream is created once and never refreshed: only drop it after it has clearly outlived any viewing.
+  const connectedCutoff = Date.now() - 12 * 60 * 60 * 1000;
+  await Promise.all(
+    old.docs
+      .filter((d) => d.get("state") !== "connected" || d.get("createdAt").toMillis() < connectedCutoff)
+      .map((d) => db.recursiveDelete(d.ref))
+  );
 });

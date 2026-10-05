@@ -161,7 +161,8 @@ class SignalingRepository @Inject constructor(private val fb: FirebaseProvider) 
         runCatching {
             val cutoff = Timestamp(Date(System.currentTimeMillis() - olderThanMs))
             val old = sessions(cameraId).whereLessThan("createdAt", cutoff).get().await()
-            old.documents.forEach { it.reference.delete() }
+            // A connected stream is created once and never refreshed: age alone must not end it.
+            old.documents.filter { it.getString("state") != SessionState.CONNECTED }.forEach { it.reference.delete() }
         }
     }
 }
