@@ -24,5 +24,8 @@ class FcmTokenManager @Inject constructor(private val fb: FirebaseProvider) {
         val t = fb.messaging.token.awaitOrNull() ?: return
         fb.firestore.collection(Paths.USERS).document(uid)
             .update("fcmTokens", FieldValue.arrayRemove(t)).awaitOrNull()
+        // The write may only be queued while offline and is dropped on sign-out; invalidating the token stops the
+        // old account's pushes for certain (the next sign-in gets a fresh token).
+        runCatching { fb.messaging.deleteToken().awaitOrNull() }
     }
 }
