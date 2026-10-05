@@ -169,13 +169,21 @@ class EventEngineTest {
     @Test fun `offline is kept locally and online is reported with offline duration`() {
         val e = engine()
         val off = e.onInput(EngineInput.NetworkChanged(1_000, online = false))
-        val on = e.onInput(EngineInput.NetworkChanged(61_000, online = true))
+        val on = e.onInput(EngineInput.NetworkChanged(181_000, online = true))
         assertEquals(EventType.CAMERA_OFFLINE, off.single().event.type)
         assertEquals("true", off.single().event.metadata[EventEngine.SOURCE_LOCAL])
         assertFalse(off.single().event.notify)
         assertEquals(EventType.CAMERA_ONLINE, on.single().event.type)
-        assertEquals(60_000L, on.single().event.durationMs)
+        assertEquals(180_000L, on.single().event.durationMs)
         assertTrue(on.single().event.notify)
+    }
+
+    @Test fun `a short wifi blip does not notify when the camera is back online`() {
+        val e = engine()
+        e.onInput(EngineInput.NetworkChanged(1_000, online = false))
+        val on = e.onInput(EngineInput.NetworkChanged(31_000, online = true))
+        assertEquals(EventType.CAMERA_ONLINE, on.single().event.type)
+        assertFalse(on.single().event.notify)
     }
 
     @Test fun `no duplicate network events when state does not change`() {

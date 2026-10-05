@@ -11,6 +11,8 @@ data class DetectionConfig(
     val presenceAbsentMs: Long = 45_000,
     /** A dog seen again after being gone this long counts as "returned" (notifies). */
     val returnMinAbsentMs: Long = 2 * 60_000,
+    /** "Camera back online" only notifies after an outage at least this long (matches the server's offline cutoff). */
+    val onlineNotifyMinOfflineMs: Long = 2 * 60_000,
     // --- movement
     /** Confirmed movement samples needed within [movementStartWindowMs] to start an event. */
     val movementStartSamples: Int = 3,
@@ -263,7 +265,8 @@ class EventEngine(
             offlineSince = null
             out += EngineOutput(
                 EngineOutput.Phase.INSTANT,
-                event(EventType.CAMERA_ONLINE, i.ts, 1f, notify = true)
+                // the server only announces "offline" after a while: a short blip must not produce a lone "back online" push
+                event(EventType.CAMERA_ONLINE, i.ts, 1f, notify = (if (since != null) i.ts - since else 0) >= config.onlineNotifyMinOfflineMs)
                     .copy(durationMs = if (since != null) i.ts - since else 0),
             )
         }
