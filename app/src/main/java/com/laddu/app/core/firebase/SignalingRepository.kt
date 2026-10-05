@@ -66,14 +66,15 @@ class SignalingRepository @Inject constructor(private val fb: FirebaseProvider) 
     // ---------------------------------------------------------------- viewer
     suspend fun createSession(cameraId: String, viewerId: String, quality: String): String {
         val ref = sessions(cameraId).document()
-        ref.set(
+        val sent = ref.set(
             mapOf(
                 "viewerId" to viewerId,
                 "state" to SessionState.REQUESTED,
                 "quality" to quality,
                 "createdAt" to FieldValue.serverTimestamp(),
             )
-        ).await()
+        ).awaitDone(10_000)
+        if (!sent) { runCatching { ref.delete() }; error("Could not reach the server") } // offline: fail fast instead of hanging
         return ref.id
     }
 
@@ -91,7 +92,7 @@ class SignalingRepository @Inject constructor(private val fb: FirebaseProvider) 
     suspend fun setAnswer(cameraId: String, sessionId: String, answer: SessionDescriptionDoc) {
         sessions(cameraId).document(sessionId).update(
             mapOf("answer" to mapOf("type" to answer.type, "sdp" to answer.sdp), "state" to SessionState.ANSWERED)
-        ).await()
+        ).awaitDone(10_000).also { check(it) { "Could not reach the server" } }
     }
 
     suspend fun setQuality(cameraId: String, sessionId: String, quality: String) {
@@ -114,7 +115,7 @@ class SignalingRepository @Inject constructor(private val fb: FirebaseProvider) 
     suspend fun setOffer(cameraId: String, sessionId: String, offer: SessionDescriptionDoc) {
         sessions(cameraId).document(sessionId).update(
             mapOf("offer" to mapOf("type" to offer.type, "sdp" to offer.sdp), "state" to SessionState.OFFERED)
-        ).await()
+        ).awaitDone(10_000).also { check(it) { "Could not reach the server" } }
     }
 
     suspend fun setState(cameraId: String, sessionId: String, state: String) {
