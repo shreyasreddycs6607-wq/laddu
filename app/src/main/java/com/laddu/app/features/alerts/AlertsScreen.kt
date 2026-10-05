@@ -98,7 +98,7 @@ class AlertsViewModel @Inject constructor(private val events: EventRepository) :
     fun setFilter(f: AlertFilter) { filter.value = f }
 
     val ui: StateFlow<Pair<AlertFilter, List<LadduEvent>?>> = combine(
-        camera.flatMapLatest { id -> if (id == null) flowOf(null) else events.observeEvents(id, 300) }, filter,
+        camera.flatMapLatest { id -> if (id == null) flowOf(emptyList<LadduEvent>()) else events.observeEvents(id, 300) }, filter,
     ) { list, f -> f to list?.filtered(f) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AlertFilter.ALL to null)
 }
