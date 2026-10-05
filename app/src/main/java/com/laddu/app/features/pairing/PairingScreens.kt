@@ -118,7 +118,7 @@ class CameraPairingViewModel @Inject constructor(
         viewModelScope.launch {
             val uid = auth.currentUid
             if (uid == null) { _ui.update { it.copy(loading = false, error = "Sign in to pair a viewer.") }; return@launch }
-            val defaultName = "Laddu Camera (${Build.MANUFACTURER.replaceFirstChar { c -> c.uppercase() }} ${Build.MODEL})"
+            val defaultName = com.laddu.app.core.firebase.defaultCameraName()
             var id = settings.cameraId()
             devices.ensureCamera(id, uid, defaultName) { settings.rotateCameraId() }.onSuccess { id = it }.onFailure { e ->
                 _ui.update { it.copy(loading = false, error = e.message ?: "Could not register this camera") }; return@launch

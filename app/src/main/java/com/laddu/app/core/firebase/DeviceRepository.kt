@@ -24,6 +24,14 @@ import java.util.Date
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** "Laddu Camera (Lenovo TB-X6C6X)": many phones already start the model name with the manufacturer, so do not repeat it. */
+fun defaultCameraName(): String {
+    val maker = android.os.Build.MANUFACTURER.lowercase().replaceFirstChar { it.uppercase() }
+    val model = android.os.Build.MODEL
+    val device = if (model.startsWith(maker, ignoreCase = true)) model else "$maker $model"
+    return "Laddu Camera ($device)"
+}
+
 @Singleton
 class DeviceRepository @Inject constructor(private val fb: FirebaseProvider) {
 
