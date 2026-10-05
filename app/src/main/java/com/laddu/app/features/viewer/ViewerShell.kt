@@ -24,6 +24,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import kotlinx.coroutines.flow.first
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -92,6 +93,7 @@ fun ViewerShell(
     // A tap on a push notification (or "VIEW LIVE") lands here.
     LaunchedEffect(link) {
         val l = link ?: return@LaunchedEffect
+        tabs.currentBackStackEntryFlow.first() // the inner NavHost has no graph until its first composition
         l.cameraId?.let { vm.select(it) }
         vm.consumeLink()
         when {
