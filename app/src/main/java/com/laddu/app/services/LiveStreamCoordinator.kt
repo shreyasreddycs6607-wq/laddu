@@ -76,14 +76,16 @@ class LiveStreamCoordinator @Inject constructor(
         s.launch { signaling.deleteStale(cameraId, 10 * 60_000L) }
         s.launch {
             while (isActive) { // the listener dies on any error (e.g. auth not ready yet): resubscribe
+              var firstSnapshot = true // only requests that predate this listener can be stale; later ones are new by definition
               runCatching { signaling.observeActiveSessions(cameraId).collect { docs ->
+                val checkStale = firstSnapshot; firstSnapshot = false
                 android.util.Log.i("Laddu", "live sessions seen: ${docs.map { it.id.take(6) + ":" + it.state }}")
                 val now = System.currentTimeMillis()
                 for (d in docs) {
                     if (d.state == SessionState.ENDED || d.state == SessionState.FAILED) continue
                     if (peers.containsKey(d.id)) continue
                     if (d.state != SessionState.REQUESTED) continue
-                    if (now - d.createdAtMs > 120_000) { signaling.endSession(cameraId, d.id); continue } // stale request
+                    if (checkStale && now - d.createdAtMs > 120_000) { signaling.endSession(cameraId, d.id); continue } // stale request
                     if (peers.size >= MAX_VIEWERS) { signaling.setState(cameraId, d.id, SessionState.FAILED); continue }
                     createPeer(d.id, d.quality)
                 }
