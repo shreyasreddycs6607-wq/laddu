@@ -36,7 +36,8 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        if (savedInstanceState == null) deepLinks.handle(intent)
+        // reopening from Recents re-delivers the task's original (notification) intent: do not replay its deep link
+        if (savedInstanceState == null && intent.flags and android.content.Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY == 0) deepLinks.handle(intent)
         setContent {
             val choice by settings.theme.collectAsState(initial = ThemeChoice.SYSTEM)
             val dark = when (choice) {
