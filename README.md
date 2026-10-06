@@ -36,6 +36,14 @@ Old phone ◀══ WebRTC (SRTP, STUN/TURN) ══▶ Viewer phone        (Fire
 
 Minimum Android: **8.0 (API 26)**. Target/compile SDK 35.
 
+## Status
+
+Verified on real devices (Lenovo TB-X6C6X tablet as camera, Galaxy phone as viewer) with a real Firebase project:
+monitoring with on-device Dog AI, QR pairing and live video over the home Wi-Fi. The tablet gets a two-column
+dashboard. Cross-network live video needs a TURN server ([docs/TURN_SETUP.md](docs/TURN_SETUP.md)); push alerts need
+the Cloud Functions deployed (Blaze plan). See the [changelog](docs/CHANGELOG.md) and
+[known limitations](docs/KNOWN_LIMITATIONS.md).
+
 ## Using it
 
 * **Camera phone**: Camera Mode → sign in → *Pair viewer* (shows a one-time QR) → *START MONITORING*. Leave it plugged in. Follow the [Oppo/ColorOS guide](docs/OPPO_COLOROS_SETUP.md).
