@@ -469,6 +469,7 @@ class CameraMonitoringService : LifecycleService() {
     }
 
     private suspend fun teardown() {
+        live.onMicSamples = null // singletons must not keep a reference to this (soon destroyed) service
         runCatching { live.stop() }
         if (::audio.isInitialized) runCatching { audio.stopAndJoin() }
         withContext(Dispatchers.Main) {
@@ -487,6 +488,7 @@ class CameraMonitoringService : LifecycleService() {
     override fun onDestroy() {
         // The OS may destroy us without a user-requested stop; make sure nothing keeps running.
         session?.cancel()
+        live.onMicSamples = null
         runCatching { cameraEngine.stop() }
         if (::audio.isInitialized) audio.stop()
         if (::framePipeline.isInitialized) framePipeline.close()
