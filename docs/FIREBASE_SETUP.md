@@ -23,6 +23,8 @@ firebase login
 firebase use <your-project-id>
 firebase deploy --only firestore:rules,firestore:indexes,storage
 cd functions && npm install && cd ..
+# getTurnCredentials declares a TURN_SECRET secret; the deploy fails without it. Any placeholder works if you do not use TURN yet:
+firebase functions:secrets:set TURN_SECRET
 firebase deploy --only functions
 ```
 * `firestore.rules` — ownership + paired-viewer authorisation, one-time pairing tokens (see [SECURITY_CHECKLIST.md](SECURITY_CHECKLIST.md)).
