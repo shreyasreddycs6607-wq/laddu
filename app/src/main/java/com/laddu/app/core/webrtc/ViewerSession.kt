@@ -111,9 +111,15 @@ class ViewerSession(
             val cfg = ice.rtcConfig(servers, forceRelay())
             val conn = webrtc.factory.createPeerConnection(cfg, observer) ?: error("Could not create connection")
             pc = conn
+            if (stopped) { pc = null; runCatching { conn.close() }; runCatching { conn.dispose() }; return } // stop() raced us
             remoteSet = false
             val sid = signaling.createSession(cameraId, viewerId, quality.name)
             android.util.Log.i("Laddu", "viewer created session $sid for camera=$cameraId")
+            if (stopped) { // stopped while the request was being written: do not leave a live connection or an orphan doc
+                pc = null; runCatching { conn.close() }; runCatching { conn.dispose() }
+                @Suppress("OPT_IN_USAGE") kotlinx.coroutines.GlobalScope.launch { signaling.endSession(cameraId, sid) }
+                return
+            }
             sessionId = sid
 
             attempt = scope.launch {
