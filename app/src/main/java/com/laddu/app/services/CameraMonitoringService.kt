@@ -196,6 +196,7 @@ class CameraMonitoringService : LifecycleService() {
     private lateinit var barkPipeline: BarkPipeline
     private lateinit var audio: AudioCapture
     private lateinit var windower: AudioWindower
+    private var barkExec: java.util.concurrent.ExecutorService = java.util.concurrent.Executors.newSingleThreadExecutor()
     @Volatile private var current = CameraSettings()
     @Volatile private var healthNow = DeviceHealth()
     @Volatile private var onlineNow = true
@@ -223,7 +224,19 @@ class CameraMonitoringService : LifecycleService() {
         framePipeline.settings = current
         barkPipeline = BarkPipeline(barkEngine, emit)
         barkPipeline.settings = current
-        windower = AudioWindower({ barkEngine.windowSamples }) { w -> barkPipeline.onWindow(w, System.currentTimeMillis()) }
+        // Inference must not run on the audio producer thread (during live view that is WebRTC's capture thread, and
+        // a slow YAMNet pass would overrun its buffer). Run it on its own thread and skip windows while it is busy.
+        val barkBusy = java.util.concurrent.atomic.AtomicBoolean(false)
+        barkExec.shutdownNow()
+        barkExec = java.util.concurrent.Executors.newSingleThreadExecutor { r -> Thread(r, "laddu-bark").apply { priority = Thread.NORM_PRIORITY - 1 } }
+        val exec = barkExec
+        windower = AudioWindower({ barkEngine.windowSamples }) { w ->
+            val t = System.currentTimeMillis()
+            if (barkBusy.compareAndSet(false, true)) {
+                runCatching { exec.execute { try { barkPipeline.onWindow(w, t) } finally { barkBusy.set(false) } } }
+                    .onFailure { barkBusy.set(false) }
+            }
+        }
         audio = AudioCapture(lifecycleScope, 16_000)
         live.onMicSamples = { d, n -> windower.push(d, n) }
 
@@ -470,6 +483,7 @@ class CameraMonitoringService : LifecycleService() {
 
     private suspend fun teardown() {
         live.onMicSamples = null // singletons must not keep a reference to this (soon destroyed) service
+        barkExec.shutdownNow()
         runCatching { live.stop() }
         if (::audio.isInitialized) runCatching { audio.stopAndJoin() }
         withContext(Dispatchers.Main) {
@@ -489,6 +503,7 @@ class CameraMonitoringService : LifecycleService() {
         // The OS may destroy us without a user-requested stop; make sure nothing keeps running.
         session?.cancel()
         live.onMicSamples = null
+        barkExec.shutdownNow()
         runCatching { cameraEngine.stop() }
         if (::audio.isInitialized) audio.stop()
         if (::framePipeline.isInitialized) framePipeline.close()
