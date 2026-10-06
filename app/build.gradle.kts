@@ -35,9 +35,10 @@ android {
         // Optional static TURN for development only. Production uses ephemeral credentials
         // issued by the `getTurnCredentials` Cloud Function (docs/TURN_SETUP.md).
         fun cfg(key: String) = "\"" + (localProps.getProperty(key) ?: "") + "\""
-        buildConfigField("String", "DEV_TURN_URL", cfg("laddu.turn.url"))
-        buildConfigField("String", "DEV_TURN_USERNAME", cfg("laddu.turn.username"))
-        buildConfigField("String", "DEV_TURN_CREDENTIAL", cfg("laddu.turn.credential"))
+        // Empty by default (so release APKs never carry a static TURN secret); debug builds fill them in below.
+        buildConfigField("String", "DEV_TURN_URL", "\"\"")
+        buildConfigField("String", "DEV_TURN_USERNAME", "\"\"")
+        buildConfigField("String", "DEV_TURN_CREDENTIAL", "\"\"")
     }
 
     signingConfigs {
@@ -52,6 +53,12 @@ android {
     }
 
     buildTypes {
+        debug {
+            fun cfg(key: String) = "\"" + (localProps.getProperty(key) ?: "") + "\""
+            buildConfigField("String", "DEV_TURN_URL", cfg("laddu.turn.url"))
+            buildConfigField("String", "DEV_TURN_USERNAME", cfg("laddu.turn.username"))
+            buildConfigField("String", "DEV_TURN_CREDENTIAL", cfg("laddu.turn.credential"))
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
