@@ -3,6 +3,7 @@ package com.laddu.app.core.events
 import android.content.Context
 import com.laddu.app.core.database.EventDao
 import com.laddu.app.core.database.toEntity
+import com.laddu.app.core.database.toModel
 import com.laddu.app.core.di.AppScope
 import com.laddu.app.core.model.LadduEvent
 import com.laddu.app.core.network.ConnectivityMonitor
@@ -64,6 +65,27 @@ class EventProcessor @Inject constructor(
             dao.upsert(event.copy(ongoing = old.ongoing && event.ongoing).toEntity(synced = false))
         }
         requestSync()
+    }
+
+    /**
+     * Adds media (clip/snapshot paths or cloud refs) to a stored event. Merges onto the row read *under the lock*,
+     * so a slow upload can never write back a stale duration/confidence/metadata snapshot of the event.
+     */
+    suspend fun attachMedia(
+        id: String, localClip: String? = null, localSnapshot: String? = null,
+        clipRef: String? = null, snapshotRef: String? = null,
+    ) {
+        val changed = lock.withLock {
+            val cur = dao.get(id)?.toModel() ?: return@withLock false
+            val merged = cur.copy(
+                localClip = localClip ?: cur.localClip, localSnapshot = localSnapshot ?: cur.localSnapshot,
+                clipRef = clipRef ?: cur.clipRef, snapshotRef = snapshotRef ?: cur.snapshotRef,
+            )
+            if (merged == cur) return@withLock false
+            dao.upsert(merged.toEntity(synced = false))
+            true
+        }
+        if (changed) requestSync()
     }
 
     fun requestSync() {

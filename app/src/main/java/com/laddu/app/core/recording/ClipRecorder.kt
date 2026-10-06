@@ -157,12 +157,8 @@ class ClipRecorder @Inject constructor(
         val ok = ClipEncoder.encode(c.frames, out)
         c.frames.clear()
         if (!ok) return
-        for (id in c.events) {
-            val row = dao.get(id)?.toModel() ?: continue
-            // events sharing one capture share the file
-            val path = if (id == c.primaryId) out.absolutePath else out.absolutePath
-            processor.update(row.copy(localClip = path))
-        }
+        // events sharing one capture share the file
+        for (id in c.events) processor.attachMedia(id, localClip = out.absolutePath)
         maybeUpload(c.events)
         cleanup()
     }
@@ -186,7 +182,7 @@ class ClipRecorder @Inject constructor(
                     ?: upload(File(row.localClip), Paths.clipPath(row.cameraId, id), "video/mp4")?.also { uploadedClips[row.localClip] = it }
                 ref?.let { updated = updated.copy(clipRef = it) }
             }
-            if (updated != row) processor.update(updated)
+            if (updated != row) processor.attachMedia(id, clipRef = updated.clipRef, snapshotRef = updated.snapshotRef)
         }
     }
 
