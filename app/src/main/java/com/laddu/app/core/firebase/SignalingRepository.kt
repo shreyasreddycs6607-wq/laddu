@@ -151,9 +151,17 @@ class SignalingRepository @Inject constructor(private val fb: FirebaseProvider) 
 
     /** Mark ended and remove (candidates are cleaned by the hourly Cloud Function). */
     suspend fun endSession(cameraId: String, sessionId: String) {
+        runCatching { purgeCandidates(sessions(cameraId).document(sessionId)) }
         runCatching {
             sessions(cameraId).document(sessionId).update("state", SessionState.ENDED).awaitOrNull(5_000)
             sessions(cameraId).document(sessionId).delete().awaitOrNull(5_000)
+        }
+    }
+
+    /** Candidate docs live in subcollections that are orphaned (and never cleaned) once the parent is deleted. */
+    private suspend fun purgeCandidates(session: com.google.firebase.firestore.DocumentReference) {
+        for (name in listOf(Paths.CAMERA_CANDIDATES, Paths.VIEWER_CANDIDATES)) {
+            session.collection(name).get().awaitOrNull(5_000)?.documents?.forEach { it.reference.delete() }
         }
     }
 
@@ -163,7 +171,7 @@ class SignalingRepository @Inject constructor(private val fb: FirebaseProvider) 
             val cutoff = Timestamp(Date(System.currentTimeMillis() - olderThanMs))
             val old = sessions(cameraId).whereLessThan("createdAt", cutoff).get().await()
             // A connected stream is created once and never refreshed: age alone must not end it.
-            old.documents.filter { it.getString("state") != SessionState.CONNECTED }.forEach { it.reference.delete() }
+            old.documents.filter { it.getString("state") != SessionState.CONNECTED }.forEach { purgeCandidates(it.reference); it.reference.delete() }
         }
     }
 }
