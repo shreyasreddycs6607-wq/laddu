@@ -5,7 +5,7 @@ Laddu runs **two on-device TensorFlow Lite (LiteRT) models** through the TFLite 
 | Purpose | File name | Default model | Task API |
 |---|---|---|---|
 | Dog detection | `dog_detector.tflite` | SSD MobileNet v1 (COCO, includes class `dog`; must have the 4-output Task metadata) | `ObjectDetector` |
-| Bark / howl / whine / speech | `bark_classifier.tflite` | YAMNet (AudioSet 521 classes) | `AudioClassifier` |
+| Bark / howl / whine / speech | `bark_classifier.tflite` + `bark_labels.txt` | YAMNet (AudioSet 521 classes) | plain TFLite `Interpreter` (the Task Audio library aborts on some Android 12 devices) |
 
 ## Install the defaults
 ```powershell

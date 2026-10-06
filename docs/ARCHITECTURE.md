@@ -34,7 +34,7 @@ CameraX (Preview + ImageAnalysis, YUV_420_888)
         │                       → DogTracker (IoU) → "dog moved?" → EngineInput.{DogSeen, DogAbsent, MovementSample}
         ├─ ClipRecorder   (JPEG ring buffer, 4 fps → encodes MP4 on events)
         └─ CameraVideoFeeder (I420 → WebRTC VideoSource, only while a viewer is connected)
-Microphone → AudioCapture → AudioWindower(0.975 s) → BarkDetectionEngine (YAMNet) → BarkPipeline → EngineInput.{BarkSample, HowlSample}
+Microphone → AudioCapture → AudioWindower(0.975 s) → BarkDetectionEngine (YAMNet via the TFLite Interpreter, own inference thread) → BarkPipeline → EngineInput.{BarkSample, HowlSample}
                        (while a viewer streams, WebRTC's audio module owns the mic and feeds the same windower)
 All inputs → Channel → EventEngine (single consumer) → EventProcessor → Room → Firestore (+ WorkManager retry)
 ```
