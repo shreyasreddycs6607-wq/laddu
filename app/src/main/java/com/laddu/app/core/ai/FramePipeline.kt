@@ -43,6 +43,7 @@ class FramePipeline(
 
     override fun onFrame(image: ImageProxy) {
         if (closed) return
+        if (motionResetRequested) { motionResetRequested = false; motion.reset() }
         val s = settings; val p = profile
         if (!s.dogDetection && !s.movementDetection) return
         val now = System.currentTimeMillis()
@@ -109,7 +110,13 @@ class FramePipeline(
         }
     }
 
-    fun reset() { motion.reset(); tracker.reset() }
+    @Volatile private var motionResetRequested = false
+
+    /** Called from the service thread; each piece of state is reset on the thread that owns it. */
+    fun reset() {
+        runCatching { executor.execute { tracker.reset() } }
+        motionResetRequested = true
+    }
 
     fun close() {
         closed = true
