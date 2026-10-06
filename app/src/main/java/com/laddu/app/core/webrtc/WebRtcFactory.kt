@@ -66,7 +66,7 @@ class IceServerProvider @Inject constructor(private val fb: FirebaseProvider) {
         val turn = fetchEphemeralTurn() ?: devTurn()
         hasTurn = turn.isNotEmpty()
         val all = stun + turn
-        cached = Cached(all, System.currentTimeMillis() + if (turn.isEmpty()) 60_000 else 5 * 3600_000L)
+        cached = Cached(all, System.currentTimeMillis() + if (turn.isEmpty()) 60_000 else 3 * 3600_000L)
         return all
     }
 
