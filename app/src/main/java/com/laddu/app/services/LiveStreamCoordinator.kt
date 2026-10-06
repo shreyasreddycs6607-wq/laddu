@@ -165,6 +165,7 @@ class LiveStreamCoordinator @Inject constructor(
 
     /** Graceful shutdown (monitoring stopped by the user). */
     suspend fun stop() {
+        scope?.cancel() // first: the session listener must not create a peer on tracks we are about to dispose
         val toClose = peers.values.toList()
         toClose.forEach { it.close(signalEnd = true) }
         disposeMedia()
@@ -172,6 +173,7 @@ class LiveStreamCoordinator @Inject constructor(
 
     /** onDestroy path: release natively, no network. */
     fun stopBlocking() {
+        scope?.cancel()
         peers.values.toList().forEach { it.close(signalEnd = false) }
         disposeMedia()
     }
