@@ -169,6 +169,7 @@ class ClipRecorder @Inject constructor(
 
     // ------------------------------------------------------------------ cloud (optional) + storage
     private suspend fun maybeUpload(ids: List<String>) {
+        val rec = settings.recordingSettings.first() // not the cached copy: it is still the default right after service start
         if (!rec.uploadToCloud || !fb.isConfigured || fb.currentUid == null) return
         if (rec.wifiOnlyUpload && !connectivity.isWifiNow()) return
         if (!connectivity.isOnlineNow()) return
