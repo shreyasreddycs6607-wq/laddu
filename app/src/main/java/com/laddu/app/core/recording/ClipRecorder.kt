@@ -173,6 +173,7 @@ class ClipRecorder @Inject constructor(
         if (!rec.uploadToCloud || !fb.isConfigured || fb.currentUid == null) return
         if (rec.wifiOnlyUpload && !connectivity.isWifiNow()) return
         if (!connectivity.isOnlineNow()) return
+        val uploadedClips = HashMap<String, String>() // events that share one capture share one uploaded MP4
         for (id in ids) {
             val row = dao.get(id)?.toModel() ?: continue
             if (row.ownerId == LOCAL_OWNER || row.ownerId != fb.currentUid) continue
@@ -181,7 +182,9 @@ class ClipRecorder @Inject constructor(
                 upload(File(row.localSnapshot), Paths.snapshotPath(row.cameraId, id), "image/jpeg")?.let { updated = updated.copy(snapshotRef = it) }
             }
             if (row.clipRef == null && row.localClip != null) {
-                upload(File(row.localClip), Paths.clipPath(row.cameraId, id), "video/mp4")?.let { updated = updated.copy(clipRef = it) }
+                val ref = uploadedClips[row.localClip]
+                    ?: upload(File(row.localClip), Paths.clipPath(row.cameraId, id), "video/mp4")?.also { uploadedClips[row.localClip] = it }
+                ref?.let { updated = updated.copy(clipRef = it) }
             }
             if (updated != row) processor.update(updated)
         }
