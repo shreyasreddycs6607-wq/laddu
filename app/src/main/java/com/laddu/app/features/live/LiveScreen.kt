@@ -127,7 +127,9 @@ class LiveViewModel @Inject constructor(
     init { viewModelScope.launch { quality.value = settings.networkSettings.first().defaultQuality } }
 
     fun setTarget(cameraId: String?, viewerId: String?, online: Boolean) {
+        val wasOnline = cameraOnline
         cameraOnline = online
+        if (wasOnline && !online) session?.cameraOffline() // camera stopped mid-stream: say so instead of ~100 s of retries
         if (this.cameraId != cameraId) { stop(); this.cameraId = cameraId }
         this.viewerId = viewerId
     }
@@ -322,7 +324,7 @@ fun VideoRenderer(track: VideoTrack, eglContext: org.webrtc.EglBase.Context, onR
         }
     }
     DisposableEffect(view) {
-        track.addSink(view)
+        runCatching { track.addSink(view) } // the track may already be disposed by a teardown racing this composition
         onReady(view)
         onDispose {
             runCatching { track.removeSink(view) }
