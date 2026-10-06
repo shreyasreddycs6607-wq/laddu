@@ -45,6 +45,16 @@ class MainActivity : ComponentActivity() {
                 ThemeChoice.LIGHT -> false
                 ThemeChoice.DARK -> true
             }
+            // status/navigation bar icon colour follows the in-app theme, not just the system night mode
+            androidx.compose.runtime.DisposableEffect(dark) {
+                enableEdgeToEdge(
+                    statusBarStyle = androidx.activity.SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT) { dark },
+                    navigationBarStyle = androidx.activity.SystemBarStyle.auto(
+                        android.graphics.Color.argb(0xe6, 0xFF, 0xFF, 0xFF), android.graphics.Color.argb(0x80, 0x1b, 0x1b, 0x1b),
+                    ) { dark },
+                )
+                onDispose {}
+            }
             LadduTheme(darkTheme = dark) {
                 Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     LadduNavHost()
