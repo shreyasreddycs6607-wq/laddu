@@ -271,7 +271,7 @@ fun LiveContent(
                     renderer?.addFrameListener({ bmp -> saveSnapshot(ctx, bmp) }, 1f)
                 }, fullscreen, enabled = ui.state == LiveState.LIVE)
                 ControlButton(Icons.Filled.Refresh, "Reconnect", "reconnect_button", onReconnect, fullscreen)
-                ControlButton(if (fullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen, "Fullscreen", "fullscreen_button", onFullscreen, fullscreen)
+                ControlButton(if (fullscreen) Icons.Filled.FullscreenExit else Icons.Filled.Fullscreen, if (fullscreen) "Exit fullscreen" else "Fullscreen", "fullscreen_button", onFullscreen, fullscreen)
             }
             if (!fullscreen) {
                 Spacer(Modifier.height(12.dp))
@@ -295,7 +295,7 @@ fun LiveContent(
 private fun ControlButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, tag: String, onClick: () -> Unit, dark: Boolean, enabled: Boolean = true) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         IconButton(onClick, enabled = enabled, modifier = Modifier.testTag(tag)) {
-            Icon(icon, label, tint = if (dark) Color.White else MaterialTheme.colorScheme.primary)
+            Icon(icon, null, tint = if (dark) Color.White else MaterialTheme.colorScheme.primary) // the visible label below is the accessible name
         }
         Text(label, style = MaterialTheme.typography.labelLarge, color = if (dark) Color.White else MaterialTheme.colorScheme.onSurfaceVariant)
     }
