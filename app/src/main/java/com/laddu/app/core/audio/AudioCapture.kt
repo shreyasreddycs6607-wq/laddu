@@ -44,6 +44,12 @@ fun resampleToMono(src: ByteArray, srcRate: Int, channels: Int, dstRate: Int): S
         mono[i] = (sum / channels).toShort()
     }
     if (srcRate == dstRate) return mono
+    if (srcRate % dstRate == 0) { // integer ratio (48 kHz -> 16 kHz): average blocks, a cheap low-pass that stops aliasing
+        val k = srcRate / dstRate
+        val avg = ShortArray(frames / k)
+        for (i in avg.indices) { var sum = 0; for (j in 0 until k) sum += mono[i * k + j]; avg[i] = (sum / k).toShort() }
+        return avg
+    }
     val outLen = (frames.toLong() * dstRate / srcRate).toInt()
     val out = ShortArray(outLen)
     val ratio = srcRate.toDouble() / dstRate
