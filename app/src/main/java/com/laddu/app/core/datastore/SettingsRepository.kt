@@ -38,6 +38,7 @@ class SettingsRepository @Inject constructor(private val store: DataStore<Prefer
         val notif = stringPreferencesKey("notification_prefs")
         val recording = stringPreferencesKey("recording_settings")
         val safety = stringPreferencesKey("safety_policy")
+        val reviewed = stringPreferencesKey("reviewed_events")
         val network = stringPreferencesKey("network_settings")
         val oemGuideSeen = booleanPreferencesKey("oem_guide_seen")
         val localOnly = booleanPreferencesKey("local_only")
@@ -99,6 +100,14 @@ class SettingsRepository @Inject constructor(private val store: DataStore<Prefer
     suspend fun updateNotifications(transform: (NotificationPrefs) -> NotificationPrefs) = store.edit { p ->
         val cur = NotificationPrefs.fromJson(p[K.notif]?.let { runCatching { JSONObject(it) }.getOrNull() })
         p[K.notif] = transform(cur).toJson().toString()
+    }
+
+    /** Hazard events this viewer has marked as reviewed. Per device on purpose: viewers cannot write to events. */
+    val reviewedEvents: Flow<Set<String>> = store.data.map { (it[K.reviewed] ?: "").split(',').filter { s -> s.isNotBlank() }.toSet() }
+
+    suspend fun markReviewed(eventId: String) = store.edit { p ->
+        val cur = (p[K.reviewed] ?: "").split(',').filter { it.isNotBlank() }
+        if (eventId !in cur) p[K.reviewed] = (cur + eventId).takeLast(500).joinToString(",")
     }
 
     suspend fun updateSafetyPolicy(transform: (com.laddu.app.core.safety.SafetyPolicy) -> com.laddu.app.core.safety.SafetyPolicy) = store.edit { p ->

@@ -28,6 +28,8 @@ import androidx.compose.material.icons.filled.DirectionsRun
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Pets
+import androidx.compose.material.icons.filled.QuestionAnswer
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.VideocamOff
@@ -76,6 +78,8 @@ fun ViewerHomeContent(
     onOpenAlerts: () -> Unit,
     onOpenActivity: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenSafety: () -> Unit = {},
+    onOpenAssistant: () -> Unit = {},
 ) {
     Column(modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp, vertical = 12.dp).testTag("viewer_home")) {
         when {
@@ -97,8 +101,9 @@ fun ViewerHomeContent(
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                     QuickAction(Icons.Filled.PlayArrow, "Live", onWatchLive, highlighted = state.online, enabled = true)
                     QuickAction(Icons.Filled.Notifications, "Alerts", onOpenAlerts)
+                    QuickAction(Icons.Filled.Shield, "Safety", onOpenSafety)
+                    QuickAction(Icons.Filled.QuestionAnswer, "Ask", onOpenAssistant)
                     QuickAction(Icons.Filled.BarChart, "Activity", onOpenActivity)
-                    QuickAction(Icons.Filled.AddCircle, "Add camera", onAddCamera)
                 }
 
                 Spacer(Modifier.height(22.dp))
@@ -128,7 +133,9 @@ fun ViewerHomeContent(
                         Stat("Dog seen", ActivityStats.formatDuration(today?.presenceMs ?: 0))
                     }
                 }
-                Spacer(Modifier.height(12.dp))
+                androidx.compose.material3.TextButton(onAddCamera, Modifier.align(Alignment.CenterHorizontally)) {
+                    Icon(Icons.Filled.AddCircle, null); Spacer(Modifier.width(6.dp)); Text("Add another camera")
+                }
             }
         }
     }

@@ -99,6 +99,9 @@ class ViewerViewModel @Inject constructor(
         }
     }
 
+    /** "Safety" on Home asks the Alerts tab to open pre-filtered. Consumed by the tab once applied. */
+    val alertFilterRequest = MutableStateFlow<com.laddu.app.features.alerts.AlertFilter?>(null)
+
     fun select(id: String) { viewModelScope.launch { settings.setSelectedCamera(id) } }
 
     fun leaveCamera(cameraId: String) {

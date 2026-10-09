@@ -134,6 +134,8 @@ fun ViewerShell(
                     onWatchLive = { tabs.navigateTab(Routes.VIEWER_LIVE) },
                     onAddCamera = onAddCamera,
                     onOpenAlerts = { tabs.navigateTab(Routes.VIEWER_ALERTS) },
+                    onOpenSafety = { vm.alertFilterRequest.value = com.laddu.app.features.alerts.AlertFilter.SAFETY; tabs.navigateTab(Routes.VIEWER_ALERTS) },
+                    onOpenAssistant = { tabs.navigate(Routes.VIEWER_ASSISTANT) { launchSingleTop = true } },
                     onOpenActivity = { tabs.navigateTab(Routes.VIEWER_ACTIVITY) },
                 )
             }
@@ -144,7 +146,11 @@ fun ViewerShell(
                     fullscreen = fullscreen, onFullscreenChange = { fullscreen = it },
                 )
             }
-            composable(Routes.VIEWER_ALERTS) { AlertsScreen(cameraId, onOpen = { onOpenEvent(it.eventId) }) }
+            composable(Routes.VIEWER_ALERTS) {
+                val req by vm.alertFilterRequest.collectAsState()
+                AlertsScreen(cameraId, onOpen = { onOpenEvent(it.eventId) }, requestedFilter = req, onFilterConsumed = { vm.alertFilterRequest.value = null })
+            }
+            composable(Routes.VIEWER_ASSISTANT) { com.laddu.app.features.assistant.AssistantScreen(cameraId, onOpenEvent = onOpenEvent) }
             composable(Routes.VIEWER_ACTIVITY) { ActivityScreen(cameraId) }
             composable(Routes.VIEWER_SETTINGS) {
                 SettingsScreen(onSignedOut = onSignedOut, onModeSwitched = onModeSwitched, onOemGuide = {}, onManageCamera = onManageCamera)

@@ -135,7 +135,9 @@ private fun dayLabel(offset: Int): String = when (offset) {
 class AlertsViewModel @Inject constructor(
     private val events: EventRepository,
     private val media: MediaRepository,
+    settings: com.laddu.app.core.datastore.SettingsRepository,
 ) : ViewModel() {
+    val reviewed: StateFlow<Set<String>> = settings.reviewedEvents.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
     private val camera = MutableStateFlow<String?>(null)
     private val filter = MutableStateFlow(AlertFilter.ALL)
     private val dayOffset = MutableStateFlow(0)
@@ -164,13 +166,19 @@ class AlertsViewModel @Inject constructor(
 }
 
 @Composable
-fun AlertsScreen(cameraId: String?, onOpen: (LadduEvent) -> Unit, vm: AlertsViewModel = hiltViewModel()) {
+fun AlertsScreen(
+    cameraId: String?, onOpen: (LadduEvent) -> Unit,
+    requestedFilter: AlertFilter? = null, onFilterConsumed: () -> Unit = {},
+    vm: AlertsViewModel = hiltViewModel(),
+) {
     LaunchedEffect(cameraId) { vm.setCamera(cameraId) }
+    LaunchedEffect(requestedFilter) { requestedFilter?.let { vm.setFilter(it); onFilterConsumed() } }
     val ui by vm.ui.collectAsState()
+    val reviewed by vm.reviewed.collectAsState()
     AlertsContent(
         filter = ui.filter, events = ui.events, onFilter = vm::setFilter, onOpen = onOpen,
         dayLabel = dayLabel(ui.dayOffset), canGoNext = ui.dayOffset > 0, dayStartMs = ui.dayStartMs,
-        onPrevDay = vm::previousDay, onNextDay = vm::nextDay, thumbnail = vm::thumbnail,
+        onPrevDay = vm::previousDay, onNextDay = vm::nextDay, thumbnail = vm::thumbnail, reviewed = reviewed,
     )
 }
 
@@ -186,6 +194,7 @@ fun AlertsContent(
     onPrevDay: () -> Unit = {},
     onNextDay: () -> Unit = {},
     thumbnail: suspend (String) -> Bitmap? = { null },
+    reviewed: Set<String> = emptySet(),
 ) {
     Column(Modifier.fillMaxSize().testTag("alerts_screen")) {
         Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
@@ -206,7 +215,7 @@ fun AlertsContent(
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                items(events, key = { it.eventId }) { e -> EventRow(e, thumbnail) { onOpen(e) } }
+                items(events, key = { it.eventId }) { e -> EventRow(e, thumbnail, reviewed = e.eventId in reviewed) { onOpen(e) } }
             }
         }
     }
@@ -279,7 +288,7 @@ fun EventTimeline(events: List<LadduEvent>, dayStartMs: Long, isToday: Boolean, 
 }
 
 @Composable
-fun EventRow(e: LadduEvent, thumbnail: suspend (String) -> Bitmap? = { null }, onClick: () -> Unit) {
+fun EventRow(e: LadduEvent, thumbnail: suspend (String) -> Bitmap? = { null }, reviewed: Boolean = false, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).testTag("event_${e.eventId}"),
         verticalAlignment = Alignment.CenterVertically,
@@ -289,6 +298,12 @@ fun EventRow(e: LadduEvent, thumbnail: suspend (String) -> Bitmap? = { null }, o
         Column(Modifier.weight(1f)) {
             Text(e.type.label, style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(2.dp))
+            if (e.type.category == EventCategory.HAZARD) {
+                Text(
+                    (e.metadata["risk"]?.lowercase()?.replaceFirstChar { it.uppercase() }?.plus(" risk") ?: "Possible hazard") + if (reviewed) " · reviewed" else " · not reviewed",
+                    style = MaterialTheme.typography.labelMedium, color = if (reviewed) MaterialTheme.colorScheme.onSurfaceVariant else categoryColor(EventCategory.HAZARD),
+                )
+            }
             Text(
                 DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(e.timestamp)) +
                     if (e.ongoing) " · ongoing" else if (e.durationMs >= 1000) " · ${ActivityStats.formatDuration(e.durationMs)}" else "",
@@ -330,6 +345,7 @@ data class EventDetailUi(
     val snapshot: Bitmap? = null,
     val clip: File? = null,
     val mediaError: String? = null,
+    val reviewed: Boolean = false,
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -337,6 +353,7 @@ data class EventDetailUi(
 class EventDetailViewModel @Inject constructor(
     private val events: EventRepository,
     private val media: MediaRepository,
+    private val settings: com.laddu.app.core.datastore.SettingsRepository,
 ) : ViewModel() {
     private val _ui = MutableStateFlow(EventDetailUi())
     val ui: StateFlow<EventDetailUi> = _ui
@@ -345,6 +362,7 @@ class EventDetailViewModel @Inject constructor(
     fun load(eventId: String) {
         if (loadedFor == eventId) return
         loadedFor = eventId
+        viewModelScope.launch { settings.reviewedEvents.collect { ids -> _ui.value = _ui.value.copy(reviewed = eventId in ids) } }
         viewModelScope.launch {
             events.observeEvent(eventId).collect { e ->
                 _ui.value = _ui.value.copy(event = e, loading = false)
@@ -355,6 +373,8 @@ class EventDetailViewModel @Inject constructor(
             }
         }
     }
+
+    fun markReviewed() { viewModelScope.launch { _ui.value.event?.let { settings.markReviewed(it.eventId) } } }
 
     fun loadClip() {
         val e = _ui.value.event ?: return
@@ -371,11 +391,11 @@ class EventDetailViewModel @Inject constructor(
 fun EventDetailScreen(eventId: String, onBack: () -> Unit, onViewLive: (String) -> Unit, vm: EventDetailViewModel = hiltViewModel()) {
     LaunchedEffect(eventId) { vm.load(eventId) }
     val ui by vm.ui.collectAsState()
-    EventDetailContent(ui, onBack, onViewLive, vm::loadClip)
+    EventDetailContent(ui, onBack, onViewLive, vm::loadClip, onReview = vm::markReviewed)
 }
 
 @Composable
-fun EventDetailContent(ui: EventDetailUi, onBack: () -> Unit, onViewLive: (String) -> Unit, onLoadClip: () -> Unit) {
+fun EventDetailContent(ui: EventDetailUi, onBack: () -> Unit, onViewLive: (String) -> Unit, onLoadClip: () -> Unit, onReview: () -> Unit = {}) {
     Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(16.dp).testTag("event_detail")) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
@@ -391,6 +411,7 @@ fun EventDetailContent(ui: EventDetailUi, onBack: () -> Unit, onViewLive: (Strin
                     Spacer(Modifier.width(10.dp))
                     Text(e.type.label, style = MaterialTheme.typography.headlineMedium, modifier = Modifier.testTag("detail_type"))
                 }
+                if (e.type.category == EventCategory.HAZARD) HazardCard(e, ui.reviewed, onReview)
                 Spacer(Modifier.height(12.dp))
                 InfoCard {
                     StatusRow("When", DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.MEDIUM).format(Date(e.timestamp)))
@@ -419,6 +440,27 @@ fun EventDetailContent(ui: EventDetailUi, onBack: () -> Unit, onViewLive: (Strin
                 Button({ onViewLive(e.cameraId) }, Modifier.fillMaxWidth().height(52.dp).testTag("view_live")) { Text("VIEW LIVE") }
             }
         }
+    }
+}
+
+@Composable
+private fun HazardCard(e: LadduEvent, reviewed: Boolean, onReview: () -> Unit) {
+    val m = e.metadata
+    Spacer(Modifier.height(12.dp))
+    InfoCard(Modifier.testTag("hazard_card")) {
+        Text("${(m["risk"] ?: "POSSIBLE").lowercase().replaceFirstChar { it.uppercase() }} risk · evidence ${m["evidence"] ?: "?"}", style = MaterialTheme.typography.titleMedium, color = categoryColor(EventCategory.HAZARD))
+        m["explanation"]?.let { Text("What the camera saw: $it", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 6.dp)) }
+        m["action"]?.let { Text("Suggested: $it", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp)) }
+        Text(
+            "This is an observation with uncertainty, not a confirmed event. Laddu cannot tell whether anything was swallowed.",
+            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp),
+        )
+        m["cloud_summary"]?.let { s ->
+            Text("Cloud second opinion (an interpretation, not a fact): $s", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 8.dp))
+        }
+        if (m["cloud_status"] == "unavailable") Text("Cloud analysis was unavailable for this event.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Button(onReview, enabled = !reviewed, modifier = Modifier.padding(top = 10.dp).testTag("mark_reviewed")) { Text(if (reviewed) "Reviewed" else "Mark as reviewed") }
+        Text("Marking reviewed never deletes the evidence.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

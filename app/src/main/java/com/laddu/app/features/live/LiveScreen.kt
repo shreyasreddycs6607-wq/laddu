@@ -278,7 +278,7 @@ fun LiveContent(
                 Text("Quality", style = MaterialTheme.typography.titleMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag("quality_selector")) {
                     StreamQuality.entries.forEach { q ->
-                        com.laddu.app.core.ui.components.ChoiceChip(ui.quality == q, { onQuality(q) }, "${q.label} (${q.height}p)")
+                        com.laddu.app.core.ui.components.ChoiceChip(ui.quality == q, { onQuality(q) }, "${q.height}p")
                     }
                 }
                 Text(
