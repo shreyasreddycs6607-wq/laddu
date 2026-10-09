@@ -278,7 +278,7 @@ fun LiveContent(
                 Text("Quality", style = MaterialTheme.typography.titleMedium)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.testTag("quality_selector")) {
                     StreamQuality.entries.forEach { q ->
-                        FilterChip(ui.quality == q, { onQuality(q) }, label = { Text("${q.label} (${q.height}p)") })
+                        com.laddu.app.core.ui.components.ChoiceChip(ui.quality == q, { onQuality(q) }, "${q.label} (${q.height}p)")
                     }
                 }
                 Text(
@@ -293,6 +293,10 @@ fun LiveContent(
 
 @Composable
 private fun ControlButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, tag: String, onClick: () -> Unit, dark: Boolean, enabled: Boolean = true) {
+    if (!dark) { // same round quick-action look as the Home screen; fullscreen keeps the bare white icons over the video
+        com.laddu.app.core.ui.components.QuickAction(icon, label, onClick, Modifier.testTag(tag), enabled)
+        return
+    }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         IconButton(onClick, enabled = enabled, modifier = Modifier.testTag(tag)) {
             Icon(icon, null, tint = if (dark) Color.White else MaterialTheme.colorScheme.primary) // the visible label below is the accessible name

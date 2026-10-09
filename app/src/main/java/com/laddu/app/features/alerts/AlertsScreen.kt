@@ -195,7 +195,7 @@ fun AlertsContent(
         EventTimeline(events.orEmpty(), dayStartMs, isToday = !canGoNext, onOpen, Modifier.padding(horizontal = 16.dp).testTag("event_timeline"))
         Spacer(Modifier.height(8.dp))
         Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            AlertFilter.entries.forEach { f -> FilterChip(filter == f, { onFilter(f) }, label = { Text(f.label) }, modifier = Modifier.testTag("filter_${f.name}")) }
+            AlertFilter.entries.forEach { f -> com.laddu.app.core.ui.components.ChoiceChip(filter == f, { onFilter(f) }, f.label, Modifier.testTag("filter_${f.name}")) }
         }
         when {
             events == null -> CenteredLoading()

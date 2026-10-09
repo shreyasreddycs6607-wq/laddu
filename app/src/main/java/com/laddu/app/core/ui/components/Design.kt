@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Icon
@@ -78,6 +79,22 @@ fun StatusTile(
         Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.padding(top = 8.dp))
         Text(value, style = MaterialTheme.typography.bodySmall, color = if (active) accent else MaterialTheme.colorScheme.onSurfaceVariant)
     }
+}
+
+/** Filter/choice chip: clearly filled and ticked when selected (the stock tint is easy to miss on dark surfaces). */
+@Composable
+fun ChoiceChip(selected: Boolean, onClick: () -> Unit, label: String, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    androidx.compose.material3.FilterChip(
+        selected, onClick, label = { Text(label) }, modifier = modifier, enabled = enabled,
+        leadingIcon = if (selected) {
+            { Icon(Icons.Filled.Check, null, Modifier.size(androidx.compose.material3.FilterChipDefaults.IconSize)) }
+        } else null,
+        colors = androidx.compose.material3.FilterChipDefaults.filterChipColors(
+            selectedContainerColor = MaterialTheme.colorScheme.primary,
+            selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+            selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary,
+        ),
+    )
 }
 
 /** "‹ Today ›" day selector. */
