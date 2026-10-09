@@ -1,0 +1,19 @@
+[Unit]
+Description=Laddu Raspberry Pi camera agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/laddu-pi/laddu_pi_agent.py --config /etc/laddu-pi/config.json
+Restart=always
+RestartSec=5
+# the agent needs the webcam device only
+DynamicUser=yes
+SupplementaryGroups=video
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
