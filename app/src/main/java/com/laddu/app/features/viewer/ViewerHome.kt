@@ -94,6 +94,11 @@ fun ViewerHomeContent(
             else -> {
                 val cam = state.selected!!
                 CameraHeader(state, onSelectCamera)
+                Text(
+                    friendlyStatus(state.online, cam.status),
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 2.dp).testTag("friendly_status"),
+                )
                 Spacer(Modifier.height(14.dp))
                 PreviewCard(cam, state.online, onWatchLive)
 
@@ -141,6 +146,16 @@ fun ViewerHomeContent(
     }
 }
 
+/** One plain sentence instead of making the owner read four tiles. */
+internal fun friendlyStatus(online: Boolean, s: com.laddu.app.core.model.CameraStatus): String = when {
+    !online -> "The camera is offline right now. What you see may be out of date."
+    s.barking && s.dogPresent -> "Your dog is in view and barking."
+    s.barking -> "Barking heard, but your dog is out of view."
+    s.dogPresent && s.moving -> "Your dog is in view and moving around."
+    s.dogPresent -> "Your dog is in view and calm."
+    else -> "All quiet. Your dog is out of the camera's view."
+}
+
 @Composable
 private fun Wordmark() {
     Text("Laddu", style = MaterialTheme.typography.headlineMedium, modifier = Modifier.padding(bottom = 8.dp))
@@ -181,7 +196,7 @@ private fun CameraHeader(state: ViewerState, onSelect: (String) -> Unit) {
 private fun PreviewCard(cam: CameraInfo, online: Boolean, onWatchLive: () -> Unit) {
     Box(
         Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(RoundedCornerShape(20.dp))
-            .background(Brush.verticalGradient(listOf(Color(0xFF1B2127), Color(0xFF0B0E11))))
+            .background(Brush.verticalGradient(listOf(Color(0xFF1B2A44), Color(0xFF0B1220))))
             .clickable(onClick = onWatchLive).testTag("home_preview"),
         contentAlignment = Alignment.Center,
     ) {

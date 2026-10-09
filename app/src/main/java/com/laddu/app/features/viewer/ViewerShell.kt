@@ -17,6 +17,7 @@ import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -120,6 +121,11 @@ fun ViewerShell(
                         onClick = { tabs.navigateTab(t.route) },
                         icon = { Icon(if (route == t.route) t.on else t.off, t.label) },
                         label = { Text(t.label) },
+                        colors = androidx.compose.material3.NavigationBarItemDefaults.colors(
+                            indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedIconColor = MaterialTheme.colorScheme.primary,
+                            selectedTextColor = MaterialTheme.colorScheme.primary,
+                        ),
                         modifier = Modifier.testTag(t.tag),
                     )
                 }
