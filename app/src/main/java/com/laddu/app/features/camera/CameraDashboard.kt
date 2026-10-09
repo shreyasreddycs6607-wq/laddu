@@ -219,6 +219,12 @@ fun CameraDashboardContent(
             }
 
             if (m.running) PrivacyIndicators(m)
+        Text(
+            if (m.running) "Laddu is watching. You will be alerted about barking, movement and possible hazards."
+            else "Monitoring is off. Put this phone where it can see your dog, plug it in, then tap START MONITORING.",
+            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 8.dp),
+        )
 
     }
     val previewBlock: @Composable () -> Unit = {
