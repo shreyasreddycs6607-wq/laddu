@@ -33,6 +33,13 @@ const PREF_KEY = {
   CAMERA_OFFLINE: "cameraOffline",
   CAMERA_ONLINE: "cameraOnline",
   LOW_BATTERY: "lowBattery",
+  // pet-safety events share one switch
+  DOG_APPROACHING_HAZARD: "hazards",
+  POSSIBLE_HAZARD_INTERACTION: "hazards",
+  POSSIBLE_CHEWING: "hazards",
+  POSSIBLE_INGESTION: "hazards",
+  HIGH_RISK_OBJECT_INTERACTION: "hazards",
+  UNKNOWN_OBJECT_NEAR_MOUTH: "hazards",
 };
 
 const TITLES = {
@@ -44,7 +51,20 @@ const TITLES = {
   CAMERA_OFFLINE: "📴 Camera offline",
   CAMERA_ONLINE: "✅ Camera online",
   LOW_BATTERY: "🔋 Camera battery low",
+  DOG_APPROACHING_HAZARD: "👀 Dog approaching a hazard",
+  POSSIBLE_HAZARD_INTERACTION: "⚠️ Possible hazard interaction",
+  POSSIBLE_CHEWING: "⚠️ Possible chewing of a hazard",
+  POSSIBLE_INGESTION: "⚠️ Possible ingestion",
+  HIGH_RISK_OBJECT_INTERACTION: "⚠️ High-risk object interaction",
+  UNKNOWN_OBJECT_NEAR_MOUTH: "⚠️ Unidentified object near your dog",
 };
+
+// Hazard events carry their own wording (written on the camera from the evidence it actually had). Cap the length so
+// a malformed client cannot push a wall of text.
+function hazardText(ev, key, fallback, max) {
+  const v = ev.metadata && ev.metadata[key];
+  return typeof v === "string" && v.trim() ? v.trim().slice(0, max) : fallback;
+}
 
 function bodyFor(type, ev) {
   const secs = Math.round((ev.durationMs || 0) / 1000);
@@ -100,8 +120,8 @@ async function pushEvent(eventId, ev) {
       eventId,
       cameraId: ev.cameraId,
       type: ev.type,
-      title: TITLES[ev.type] || "Laddu",
-      body: bodyFor(ev.type, ev),
+      title: hazardText(ev, "title", TITLES[ev.type] || "Laddu", 80),
+      body: hazardText(ev, "body", bodyFor(ev.type, ev), 300),
       cameraName: String(cam.name || "Laddu camera"),
       timestamp: String(ev.timestamp || Date.now()),
     },
