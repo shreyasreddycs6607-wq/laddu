@@ -104,7 +104,7 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier) {
 fun InfoCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) { Column(Modifier.padding(16.dp)) { content() } }
 }
 

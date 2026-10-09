@@ -44,23 +44,26 @@ private val Light = lightColorScheme(
     error = StatusRed,
 )
 
+// Dark-first palette: cool charcoal surfaces (so video and thumbnails stand out) with Laddu orange as the one accent.
 private val Dark = darkColorScheme(
-    primary = LadduOrange,
-    onPrimary = Color(0xFF4A2800),
-    primaryContainer = Color(0xFF6B3C00),
-    onPrimaryContainer = Color(0xFFFFDCBB),
-    secondary = Color(0xFFE2C1A0),
-    onSecondary = Color(0xFF402C14),
-    secondaryContainer = Color(0xFF59422A),
-    onSecondaryContainer = Color(0xFFF3DFCB),
-    tertiary = Color(0xFF5BD6C6),
-    onTertiary = Color(0xFF003731),
-    background = Color(0xFF17120D),
-    onBackground = Color(0xFFEDE0D4),
-    surface = Color(0xFF1F1812),
-    onSurface = Color(0xFFEDE0D4),
-    surfaceVariant = Color(0xFF3A2F26),
-    onSurfaceVariant = Color(0xFFD7C3B3),
+    primary = Color(0xFFF0922F),
+    onPrimary = Color(0xFF3A2000),
+    primaryContainer = Color(0xFF4A2F10),
+    onPrimaryContainer = Color(0xFFFFDDB8),
+    secondary = Color(0xFFB9C3CC),
+    onSecondary = Color(0xFF1B242B),
+    secondaryContainer = Color(0xFF2A333B),
+    onSecondaryContainer = Color(0xFFDCE4EA),
+    tertiary = Color(0xFF58D3C4),
+    onTertiary = Color(0xFF00332D),
+    background = Color(0xFF0E1114),
+    onBackground = Color(0xFFE6EAED),
+    surface = Color(0xFF14181C),
+    onSurface = Color(0xFFE6EAED),
+    surfaceVariant = Color(0xFF1C2228),
+    onSurfaceVariant = Color(0xFF9FAAB4),
+    outline = Color(0xFF3B454E),
+    outlineVariant = Color(0xFF272F36),
     error = Color(0xFFFF8A80),
 )
 
@@ -72,6 +75,8 @@ private val LadduTypography = Typography(
     bodyLarge = TextStyle(fontSize = 16.sp, lineHeight = 22.sp),
     bodyMedium = TextStyle(fontSize = 14.sp, lineHeight = 20.sp),
     labelLarge = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium),
+    labelMedium = TextStyle(fontSize = 12.sp, fontWeight = FontWeight.Medium, letterSpacing = 0.2.sp),
+    bodySmall = TextStyle(fontSize = 12.sp, lineHeight = 16.sp),
 )
 
 private val LadduShapes = Shapes(

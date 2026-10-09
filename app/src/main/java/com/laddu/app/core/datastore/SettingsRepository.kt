@@ -47,7 +47,7 @@ class SettingsRepository @Inject constructor(private val store: DataStore<Prefer
 
     val appMode: Flow<AppMode?> = store.data.map { p -> p[K.mode]?.let { m -> AppMode.entries.firstOrNull { it.name == m } } }
     val onboarded: Flow<Boolean> = store.data.map { it[K.onboarded] ?: false }
-    val theme: Flow<ThemeChoice> = store.data.map { enumOr(it[K.theme], ThemeChoice.SYSTEM) }
+    val theme: Flow<ThemeChoice> = store.data.map { enumOr(it[K.theme], ThemeChoice.DARK) }
     val monitoringDesired: Flow<Boolean> = store.data.map { it[K.monitoringDesired] ?: false }
     val selectedCameraId: Flow<String?> = store.data.map { it[K.selectedCameraId] }
     val oemGuideSeen: Flow<Boolean> = store.data.map { it[K.oemGuideSeen] ?: false }
