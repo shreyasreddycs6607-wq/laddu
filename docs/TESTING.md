@@ -1,7 +1,7 @@
 # Testing guide
 
 ## Unit tests (JVM, no device) — `./gradlew :app:testDebugUnitTest`
-(75 tests, all passing at the time of writing.)  
+(113 tests, all passing at the time of writing; plus 9 Python tests for the Pi agent: `python pi-agent/test_agent.py`.)  
 *Windows machines where Gradle cannot fork JVMs* (`Unable to establish loopback connection`): run Gradle in-process
 (see [RELEASE.md](RELEASE.md)), build the test classpath with `:app:dumpUnitTestClasspath`, then run
 `java @args org.junit.runner.JUnitCore <all *Test classes>` with `-cp` taken from `app/build/unit-test-classpath.txt`.
@@ -19,6 +19,16 @@
 | Notification logic | `core/notifications/NotificationPolicyTest` | per-type switches, cooldowns, FCM parsing |
 | WebRTC lifecycle / reconnection | `core/webrtc/LiveSessionStateMachineTest` | connect, blip, bounded reconnect + back-off, failure, stop |
 | Thermal / profiles / settings / routing / analytics | `AiAndSettingsTest` | AI profiles, thermal, JSON settings, router, daily stats |
+| Hazard detection | `core/safety/HazardEngineTest` | walking past vs sniffing vs pickup vs chewing, approved/restricted items, brief touch / dog out of view (no ingestion claim), one notification per incident, escalation, policy JSON |
+| Summaries & assistant | `core/insights/InsightsTest` | monitoring gaps, bark episodes, baseline needs history, honest "no records" answers |
+| Cloud response validation | `core/inference/CloudAnalysisParserTest` | wrong event, bad confidence/category, oversized or missing fields |
+| Audio resampling | `core/audio/ResampleTest` | 48k→16k block averaging, stereo mix-down |
+
+## Testing hazard detection safely
+Never expose a dog to anything dangerous. Use harmless stand-ins under supervision: an empty, clean plastic bottle or a clean cloth
+placed on the floor, or recorded footage. Check that (1) a dog walking past stays silent, (2) sniffing gives at most a *caution*,
+(3) picking it up or chewing gives a *high* alert, and (4) one continuing incident sends one notification. Measure real alert
+latency and false alerts per hour on your own footage before trusting any number; none have been measured yet.
 
 ## Instrumented tests (device/emulator) — `./gradlew :app:connectedDebugAndroidTest`
 Compose UI tests on stateless screen content (`androidTest/.../ui`):

@@ -1,5 +1,17 @@
 # Changelog
 
+## Pet-safety upgrade (hazard detection, insights, optional cloud AI, Pi agent)
+
+* **Hazard detection** (`core/safety`): owner-editable policy (Approved / Restricted / Hazardous per item), object tracking,
+  dog-object interaction analysis (near, approaching, sniffing-like, pickup, carrying, chewing-like, vanished-after-contact),
+  risk levels, one incident per situation with deliberate escalation, local alerts that never wait for the cloud.
+  New event types, Safety filter, hazard detail card with "mark reviewed" (per viewer; never deletes evidence).
+* **Detector** returns dogs and objects from one inference pass.
+* **Insights** (`core/insights`): day summaries that respect monitoring gaps, per-dog baseline, event-backed "Ask Laddu" assistant.
+* **Optional cloud second opinion** (`core/inference`, `analyzeHazardEvidence`): off by default, no key in the app, validated, rate-limited. Not live-tested.
+* **Pi B+ agent** (`pi-agent/`): capture, reconnect, health, token-protected snapshot/MJPEG. Not run on real hardware.
+* Viewer UI redesign (dark-first, quick actions, status tiles, alerts timeline with thumbnails).
+
 ## Real-device hardening pass (Lenovo TB-X6C6X camera + Galaxy phone viewer, real Firebase project)
 
 Found by a 90-finding audit and verified/fixed on real devices. About 75 are fixed; each fix is its own commit

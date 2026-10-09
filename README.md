@@ -20,6 +20,7 @@ Old phone ◀══ WebRTC (SRTP, STUN/TURN) ══▶ Viewer phone        (Fire
 | `functions/` | Firebase Cloud Functions: push notifications, offline detection, TURN credentials, cleanup |
 | `firestore.rules`, `storage.rules`, `firestore.indexes.json`, `firebase.json` | Firebase backend config |
 | `scripts/download_models.ps1` | Fetches the two on-device AI models |
+| `pi-agent/` | Lightweight Raspberry Pi B+ webcam agent (capture + token-protected HTTP) |
 | `docs/` | Architecture, setup guides, testing, limitations, checklists |
 
 ## Quick start (developer)
@@ -48,6 +49,8 @@ the Cloud Functions deployed (Blaze plan). See the [changelog](docs/CHANGELOG.md
 
 * **Camera phone**: Camera Mode → sign in → *Pair viewer* (shows a one-time QR) → *START MONITORING*. Leave it plugged in. Follow the [Oppo/ColorOS guide](docs/OPPO_COLOROS_SETUP.md).
 * **Viewer phone**: Viewer Mode → sign in → *Add camera* → scan the QR → **Live**.
+
+Pet safety: [Hazard detection](docs/HAZARD_DETECTION.md) · [Cloud AI (optional)](docs/CLOUD_AI.md) · [Raspberry Pi camera agent](pi-agent/README.md)
 
 More: [Camera Mode](docs/CAMERA_MODE.md) · [Viewer Mode](docs/VIEWER_MODE.md) · [Architecture](docs/ARCHITECTURE.md) · [WebRTC](docs/WEBRTC.md) · [FCM](docs/FCM_SETUP.md) · [Testing](docs/TESTING.md) · [Known limitations](docs/KNOWN_LIMITATIONS.md) · [Release build](docs/RELEASE.md) · [External config checklist](docs/EXTERNAL_CONFIG_CHECKLIST.md) · [Security checklist](docs/SECURITY_CHECKLIST.md) · [Roadmap](docs/ROADMAP.md)
 

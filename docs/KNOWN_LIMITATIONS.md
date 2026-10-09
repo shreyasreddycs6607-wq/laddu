@@ -1,8 +1,17 @@
 # Known limitations (honest list)
 
-**Verification status.** Debug and release (R8) builds succeed, the 75 JVM unit tests pass and the instrumented UI tests compile. It has been run on a Lenovo TB-X6C6X tablet (camera mode) and a Galaxy phone (viewer mode) against a real Firebase project (Firestore rules/indexes deployed): monitoring, Dog AI, pairing and live video over the home Wi-Fi work. **Not verified:** an Oppo/ColorOS phone, FCM push delivery (Cloud Functions are not deployed), TURN/relay across different networks, and the dog/bark detectors on real dog input. See [CHANGELOG.md](CHANGELOG.md) for what was fixed and [TESTING.md](TESTING.md) for the checklist.
+**Verification status.** Debug and release (R8) builds succeed, the 113 JVM unit tests pass and the instrumented UI tests compile. It has been run on a Lenovo TB-X6C6X tablet (camera mode) and a Galaxy phone (viewer mode) against a real Firebase project (Firestore rules/indexes deployed): monitoring, Dog AI, pairing and live video over the home Wi-Fi work. **Not verified:** an Oppo/ColorOS phone, FCM push delivery (Cloud Functions are not deployed), TURN/relay across different networks, and the dog/bark detectors on real dog input. See [CHANGELOG.md](CHANGELOG.md) for what was fixed and [TESTING.md](TESTING.md) for the checklist.
 
 **Open findings** (see CHANGELOG): service start during shutdown (F19/F20), dog box overlay/orientation (F28/F33), permanently-denied permission detection (F30), 720p crop and mic hand-off to live view (F43/F44), server-side push throttling (F57), 16 KB page alignment of native libraries (F58), and a few low-severity items.
+
+**Pet-safety / AI additions (see [HAZARD_DETECTION.md](HAZARD_DETECTION.md))**
+* Hazard detection is verified only on synthetic frame sequences (unit tests), not on real dog footage, and has no measured accuracy or false-alert rate.
+* The bundled COCO detector cannot see plastic wrappers, socks, rubbish, chocolate, grapes or faeces; those policy items need a different model. No "unknown object" detection exists without a class-agnostic model.
+* There is no pose/mouth model: "contact" means inside the dog's body box. Vanishing objects are reported only as *possible* ingestion.
+* Cloud second opinion (docs/CLOUD_AI.md) is built but not deployed or live-tested; it needs the Blaze plan and your own analyzer endpoint.
+* The assistant is rule-based over stored events (no language model); behaviour baselines need at least 3 well-monitored days.
+* The Pi agent ([pi-agent/](../pi-agent/README.md)) is unit-tested but not run on a real Pi B+; the Android app cannot yet consume its stream.
+* Barking intensity and howling/whining sub-classes are not separately analysed; "behaviour" observations are limited to event counts vs baseline.
 
 **Android platform rules (by design, not bugs)**
 * Camera/microphone foreground services cannot be started silently after reboot or from a background restart (Android 11–15). Laddu shows a *tap to resume* notification instead.
