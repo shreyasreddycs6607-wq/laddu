@@ -33,6 +33,7 @@ object DatabaseModule {
 abstract class BindingsModule {
     @Binds abstract fun auth(impl: FirebaseAuthRepository): AuthRepository
     @Binds abstract fun eventRemote(impl: FirestoreEventRemote): EventRemote
+    @Binds abstract fun inferenceProvider(impl: com.laddu.app.core.inference.FirebaseCloudInferenceProvider): com.laddu.app.core.inference.DogSafetyInferenceProvider
     @Binds abstract fun dogEngine(impl: com.laddu.app.core.ai.TfliteDogDetectionEngine): com.laddu.app.core.ai.DogDetectionEngine
     @Binds abstract fun barkEngine(impl: com.laddu.app.core.audio.TfliteBarkDetectionEngine): com.laddu.app.core.audio.BarkDetectionEngine
 }

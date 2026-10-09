@@ -169,6 +169,12 @@ fun SettingsContent(ui: SettingsUi, a: SettingsActions, modifier: Modifier = Mod
                 SwitchRow("Watch for hazards", p.enabled, true, "sw_safety") { v -> a.updateSafety { it.copy(enabled = v) } }
                 SliderRow("Hazard sensitivity", p.sensitivity, p.enabled, "slider_safety") { v -> a.updateSafety { it.copy(sensitivity = v) } }
                 SwitchRow("Alert on unidentified objects", p.unknownObjectAlerts, p.enabled) { v -> a.updateSafety { it.copy(unknownObjectAlerts = v) } }
+                SwitchRow("Cloud second opinion (uploads one small snapshot per hazard)", p.cloudAnalysis, p.enabled, "sw_cloud_ai") { v -> a.updateSafety { it.copy(cloudAnalysis = v) } }
+                if (p.cloudAnalysis) Text(
+                    "When a hazard is detected, one reduced photo and a short text are sent to your own Firebase function for analysis. " +
+                        "Local alerts never wait for it. Requires the server to be set up (docs/CLOUD_AI.md).",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 Text(
                     "Laddu reports what the camera appears to show, with uncertainty. It cannot confirm that anything was swallowed " +
                         "and does not replace watching your dog or veterinary advice.",

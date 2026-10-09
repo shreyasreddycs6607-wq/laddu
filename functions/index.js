@@ -22,6 +22,8 @@ admin.initializeApp();
 const db = admin.firestore();
 
 const TURN_SECRET = defineSecret("TURN_SECRET");
+const ANALYZER_KEY = defineSecret("ANALYZER_KEY");
+const ANALYZER_URL = defineString("ANALYZER_URL", { default: "" }); // your analysis endpoint (see docs/CLOUD_AI.md)
 const TURN_URLS = defineString("TURN_URLS", { default: "" }); // comma separated, e.g. turn:turn.example.com:3478?transport=udp,turns:turn.example.com:5349
 
 const PREF_KEY = {
@@ -190,4 +192,45 @@ exports.cleanupStaleSessions = onSchedule("every 60 minutes", async () => {
       .filter((d) => d.get("state") !== "connected" || d.get("createdAt").toMillis() < connectedCutoff)
       .map((d) => db.recursiveDelete(d.ref))
   );
+});
+
+/**
+ * Optional hazard second opinion. The app never holds a provider key: it calls this function, which checks the caller
+ * owns the camera, validates the upload, rate-limits per user, then forwards to the endpoint YOU configure
+ * (ANALYZER_URL / ANALYZER_KEY). Contract: docs/CLOUD_AI.md. Not configured -> failed-precondition (the app copes).
+ */
+exports.analyzeHazardEvidence = onCall({ secrets: [ANALYZER_KEY], timeoutSeconds: 45, memory: "256MiB" }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign in first.");
+  const { eventId, cameraId, image, localSummary } = request.data || {};
+  if (typeof eventId !== "string" || !eventId || eventId.length > 128) throw new HttpsError("invalid-argument", "eventId");
+  if (typeof cameraId !== "string" || !cameraId || cameraId.length > 128) throw new HttpsError("invalid-argument", "cameraId");
+  // ~300 KB of JPEG is ~400 KB of base64; JPEGs start with /9j/ in base64
+  if (typeof image !== "string" || image.length > 420000 || !image.startsWith("/9j/")) throw new HttpsError("invalid-argument", "image must be a small JPEG");
+  const summary = typeof localSummary === "string" ? localSummary.slice(0, 500) : "";
+
+  const dev = (await db.doc(`devices/${cameraId}`).get()).data();
+  if (!dev || dev.ownerId !== request.auth.uid) throw new HttpsError("permission-denied", "Not your camera.");
+
+  // 30 analyses per user per hour
+  const hour = Math.floor(Date.now() / 3600000);
+  const usage = db.doc(`analysisUsage/${request.auth.uid}`);
+  await db.runTransaction(async (tx) => {
+    const d = (await tx.get(usage)).data() || {};
+    const count = d.hour === hour ? d.count || 0 : 0;
+    if (count >= 30) throw new HttpsError("resource-exhausted", "Hourly analysis limit reached.");
+    tx.set(usage, { hour, count: count + 1 });
+  });
+
+  const url = ANALYZER_URL.value();
+  if (!url) throw new HttpsError("failed-precondition", "Cloud analysis is not configured on the server.");
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${ANALYZER_KEY.value()}` },
+    body: JSON.stringify({ schema: "laddu-hazard-v1", eventId, image, localSummary: summary }),
+    signal: AbortSignal.timeout(35000),
+  });
+  if (!res.ok) throw new HttpsError("unavailable", `Analyzer returned ${res.status}.`);
+  const out = await res.json();
+  if (!out || out.eventId !== eventId) throw new HttpsError("internal", "Analyzer response did not match the request.");
+  return out; // the app validates the schema again before storing anything
 });

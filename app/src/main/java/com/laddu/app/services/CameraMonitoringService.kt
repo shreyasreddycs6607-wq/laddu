@@ -31,6 +31,7 @@ import com.laddu.app.core.device.DeviceHealth
 import com.laddu.app.core.device.DeviceHealthMonitor
 import com.laddu.app.core.events.DetectionConfig
 import com.laddu.app.core.events.EngineInput
+import com.laddu.app.core.events.EngineOutput
 import com.laddu.app.core.events.EventEngine
 import com.laddu.app.core.events.EventProcessor
 import com.laddu.app.core.firebase.AuthRepository
@@ -81,6 +82,7 @@ class CameraMonitoringService : LifecycleService() {
     @Inject lateinit var holder: MonitoringStateHolder
     @Inject lateinit var dao: EventDao
     @Inject lateinit var live: LiveStreamCoordinator
+    @Inject lateinit var cloudAi: com.laddu.app.core.inference.HybridInferenceCoordinator
     @Inject lateinit var clips: com.laddu.app.core.recording.ClipRecorder
 
     private var session: Job? = null
@@ -269,6 +271,10 @@ class CameraMonitoringService : LifecycleService() {
                 val out = engine.onInput(i)
                 if (out.isNotEmpty()) {
                     processor.handle(out)
+                    // The local alert has already been raised; the optional cloud second opinion runs on its own and
+                    // can only add context later.
+                    out.filter { it.phase == EngineOutput.Phase.STARTED && it.event.type.category == com.laddu.app.core.model.EventCategory.HAZARD && it.event.notify }
+                        .forEach { o -> launch(Dispatchers.IO) { runCatching { cloudAi.maybeAnalyze(o.event) } } }
                     out.lastOrNull()?.let { o -> holder.update { it.copy(lastEvent = "${o.event.type.label} · ${java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(o.event.timestamp))}") } }
                 }
                 publishStatus()

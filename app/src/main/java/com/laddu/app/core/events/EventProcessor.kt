@@ -88,6 +88,18 @@ class EventProcessor @Inject constructor(
         if (changed) requestSync()
     }
 
+    /** Adds keys (e.g. cloud analysis results) to a stored event under the lock, without touching anything else. */
+    suspend fun attachMetadata(id: String, extra: Map<String, String>) {
+        val changed = lock.withLock {
+            val cur = dao.get(id)?.toModel() ?: return@withLock false
+            val merged = cur.copy(metadata = cur.metadata + extra)
+            if (merged == cur) return@withLock false
+            dao.upsert(merged.toEntity(synced = false))
+            true
+        }
+        if (changed) requestSync()
+    }
+
     fun requestSync() {
         if (connectivity.isOnlineNow()) {
             scope.launch {

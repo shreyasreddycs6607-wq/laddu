@@ -61,6 +61,8 @@ data class SafetyPolicy(
     val sensitivity: Float = 0.5f,
     /** Alert on objects the detector cannot name (only possible with a class-agnostic or open-vocabulary model). */
     val unknownObjectAlerts: Boolean = true,
+    /** Optional: send a small snapshot of a hazard event to the cloud function for a second opinion. Off by default. */
+    val cloudAnalysis: Boolean = false,
     val items: List<SafetyItem> = DefaultSafety.items,
 ) {
     private val byLabel: Map<String, SafetyItem> by lazy {
@@ -76,7 +78,7 @@ data class SafetyPolicy(
     val criticalMin: Float get() = 0.85f - 0.10f * sensitivity.coerceIn(0f, 1f)
 
     fun toJson() = JSONObject().apply {
-        put("enabled", enabled); put("sensitivity", sensitivity.toDouble()); put("unknownObjectAlerts", unknownObjectAlerts)
+        put("enabled", enabled); put("sensitivity", sensitivity.toDouble()); put("unknownObjectAlerts", unknownObjectAlerts); put("cloudAnalysis", cloudAnalysis)
         put("items", JSONArray(items.map { it.toJson() }))
     }
 
@@ -88,6 +90,7 @@ data class SafetyPolicy(
                 enabled = j.optBoolean("enabled", true),
                 sensitivity = j.optDouble("sensitivity", 0.5).toFloat().coerceIn(0f, 1f),
                 unknownObjectAlerts = j.optBoolean("unknownObjectAlerts", true),
+                cloudAnalysis = j.optBoolean("cloudAnalysis", false),
                 items = if (items.isNullOrEmpty()) DefaultSafety.items else items,
             )
         }
