@@ -11,6 +11,11 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -46,6 +51,7 @@ fun AuthContent(
     var name by rememberSaveable { mutableStateOf("") }
     var email by rememberSaveable { mutableStateOf("") }
     var password by rememberSaveable { mutableStateOf("") }
+    var showPassword by rememberSaveable { mutableStateOf(false) }
 
     Column(
         modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp)
@@ -59,7 +65,16 @@ fun AuthContent(
             when (mode) { AuthMode.LOGIN -> "Welcome back"; AuthMode.SIGN_UP -> "Create your account"; AuthMode.RESET -> "Reset password" },
             style = MaterialTheme.typography.headlineMedium,
         )
-        Spacer(Modifier.height(20.dp))
+        Text(
+            when (mode) {
+                AuthMode.LOGIN -> "Log in to see your dog."
+                AuthMode.SIGN_UP -> "It takes a minute. Use the same account on both phones."
+                AuthMode.RESET -> "We will email you a link to choose a new password."
+            },
+            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        Spacer(Modifier.height(24.dp))
 
         state.error?.let { ErrorBanner(it, Modifier.testTag("auth_error")); Spacer(Modifier.height(12.dp)) }
         state.info?.let { InfoCard(Modifier.testTag("auth_info")) { Text(it) }; Spacer(Modifier.height(12.dp)) }
@@ -67,12 +82,14 @@ fun AuthContent(
         if (mode == AuthMode.SIGN_UP) {
             OutlinedTextField(
                 name, { name = it }, label = { Text("Your name") }, singleLine = true,
+                leadingIcon = { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.Person, null) },
                 isError = state.nameError != null, supportingText = state.nameError?.let { { Text(it) } },
                 modifier = Modifier.fillMaxWidth().testTag("field_name"),
             )
         }
         OutlinedTextField(
             email, { email = it }, label = { Text("Email") }, singleLine = true,
+            leadingIcon = { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.Email, null) },
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
             isError = state.emailError != null, supportingText = state.emailError?.let { { Text(it) } },
             modifier = Modifier.fillMaxWidth().testTag("field_email"),
@@ -80,7 +97,16 @@ fun AuthContent(
         if (mode != AuthMode.RESET) {
             OutlinedTextField(
                 password, { password = it }, label = { Text("Password") }, singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
+                leadingIcon = { androidx.compose.material3.Icon(androidx.compose.material.icons.Icons.Filled.Lock, null) },
+                trailingIcon = {
+                    androidx.compose.material3.IconButton({ showPassword = !showPassword }) {
+                        androidx.compose.material3.Icon(
+                            if (showPassword) androidx.compose.material.icons.Icons.Filled.VisibilityOff else androidx.compose.material.icons.Icons.Filled.Visibility,
+                            if (showPassword) "Hide password" else "Show password",
+                        )
+                    }
+                },
+                visualTransformation = if (showPassword) androidx.compose.ui.text.input.VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 isError = state.passwordError != null, supportingText = state.passwordError?.let { { Text(it) } },
                 modifier = Modifier.fillMaxWidth().testTag("field_password"),
@@ -90,7 +116,7 @@ fun AuthContent(
         Button(
             onClick = { onSubmit(name, email, password) },
             enabled = !state.loading,
-            modifier = Modifier.fillMaxWidth().height(52.dp).testTag("auth_submit"),
+            modifier = Modifier.fillMaxWidth().height(56.dp).testTag("auth_submit"),
         ) {
             if (state.loading) CircularProgressIndicator(Modifier.height(22.dp), strokeWidth = 2.dp)
             else Text(when (mode) { AuthMode.LOGIN -> "Log in"; AuthMode.SIGN_UP -> "Sign up"; AuthMode.RESET -> "Send reset email" })
