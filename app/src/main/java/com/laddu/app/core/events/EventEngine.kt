@@ -66,7 +66,10 @@ data class EngineOutput(val phase: Phase, val event: LadduEvent) {
     enum class Phase { STARTED, COMPLETED, INSTANT }
 }
 
-data class LiveDetectionStatus(val dogPresent: Boolean, val moving: Boolean, val barking: Boolean)
+data class LiveDetectionStatus(
+    val dogPresent: Boolean, val moving: Boolean, val barking: Boolean,
+    val activity: com.laddu.app.core.insights.DogActivity = com.laddu.app.core.insights.DogActivity.OUT_OF_VIEW,
+)
 
 internal class IdSource(private val gen: () -> String) { fun next() = gen() }
 
@@ -123,7 +126,12 @@ class EventEngine(
     private var lastMovementNotifyTs = Long.MIN_VALUE / 2
     private var movementPeak = 0f
 
+    private var lastSampleTs = 0L
+    private var lastSampleAmount = 0f
+
     private fun onMovement(i: EngineInput.MovementSample, out: MutableList<EngineOutput>) {
+        lastSampleTs = i.ts
+        lastSampleAmount = if (i.confirmed) i.amount else 0f
         if (!i.confirmed) return
         lastMovementTs = i.ts
         movementPeak = maxOf(movementPeak, i.amount)
@@ -306,11 +314,16 @@ class EventEngine(
         return out
     }
 
-    fun status(now: Long) = LiveDetectionStatus(
-        dogPresent = presenceEvent != null && now - lastSeenTs < config.presenceAbsentMs,
-        moving = movementEvent != null && now - lastMovementTs < config.movementEndGapMs,
-        barking = barkEvent != null && now - lastBarkTs < config.barkEndGapMs,
-    )
+    fun status(now: Long): LiveDetectionStatus {
+        val present = presenceEvent != null && now - lastSeenTs < config.presenceAbsentMs
+        return LiveDetectionStatus(
+            dogPresent = present,
+            moving = movementEvent != null && now - lastMovementTs < config.movementEndGapMs,
+            barking = barkEvent != null && now - lastBarkTs < config.barkEndGapMs,
+            // a stale motion sample means "no recent movement", not "still moving"
+            activity = com.laddu.app.core.insights.ActivityClassifier.classify(present, if (now - lastSampleTs < 4_000) lastSampleAmount else 0f),
+        )
+    }
 
     /** Close every running event (monitoring stopped). */
     fun flush(now: Long): List<EngineOutput> {

@@ -402,6 +402,7 @@ class CameraMonitoringService : LifecycleService() {
             dogPresent = live?.dogPresent ?: false,
             moving = live?.moving ?: false,
             barking = live?.barking ?: false,
+            activity = (live?.activity ?: com.laddu.app.core.insights.DogActivity.OUT_OF_VIEW).name,
             batteryPct = healthNow.batteryPct,
             charging = healthNow.charging,
             temperatureC = healthNow.temperatureC,

@@ -151,7 +151,8 @@ internal fun friendlyStatus(online: Boolean, s: com.laddu.app.core.model.CameraS
     !online -> "The camera is offline right now. What you see may be out of date."
     s.barking && s.dogPresent -> "Your dog is in view and barking."
     s.barking -> "Barking heard, but your dog is out of view."
-    s.dogPresent && s.moving -> "Your dog is in view and moving around."
+    s.dogPresent && s.activity == "RUNNING" -> "Your dog is in view and moving quickly (running-like)."
+    s.dogPresent && (s.activity == "WALKING" || s.moving) -> "Your dog is in view and moving around (walking-like)."
     s.dogPresent -> "Your dog is in view and calm."
     else -> "All quiet. Your dog is out of the camera's view."
 }

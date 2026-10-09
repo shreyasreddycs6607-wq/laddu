@@ -68,6 +68,8 @@ data class CameraStatus(
     val aiReady: Boolean = false,
     val barkAiReady: Boolean = false,
     val online: Boolean = true,
+    /** [com.laddu.app.core.insights.DogActivity] name; a string so older apps ignore it safely. */
+    val activity: String = "OUT_OF_VIEW",
 )
 
 data class CameraInfo(

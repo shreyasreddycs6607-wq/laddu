@@ -59,6 +59,7 @@ fun CameraStatus.toMap(): Map<String, Any?> = mapOf(
     "aiMode" to aiMode.name,
     "aiReady" to aiReady,
     "barkAiReady" to barkAiReady,
+    "activity" to activity,
 )
 
 @Suppress("UNCHECKED_CAST")
@@ -83,6 +84,7 @@ fun DocumentSnapshot.toCamera(): CameraInfo? {
             aiMode = enumOr(s["aiMode"] as? String, AiPerformanceMode.BALANCED),
             aiReady = s["aiReady"] as? Boolean ?: false,
             barkAiReady = s["barkAiReady"] as? Boolean ?: false,
+            activity = com.laddu.app.core.insights.ActivityClassifier.parse(s["activity"] as? String).name,
         ),
     )
 }
