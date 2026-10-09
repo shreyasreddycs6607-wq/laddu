@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="laddu_orange">#E8892B</color>
-    <color name="laddu_splash_bg">#FFF8F0</color>
-    <color name="ic_launcher_background">#E8892B</color>
+    <color name="laddu_orange">#2DD4BF</color>
+    <color name="laddu_splash_bg">#0B1220</color>
+    <color name="ic_launcher_background">#14B8A6</color>
 </resources>

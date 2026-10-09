@@ -27,7 +27,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import com.laddu.app.core.ui.components.DayBar
+import com.laddu.app.core.ui.theme.HazardCoral
 import com.laddu.app.core.ui.theme.StatusAmber
+import com.laddu.app.core.ui.theme.SystemGrey
 import com.laddu.app.core.ui.theme.StatusGreen
 import com.laddu.app.core.ui.theme.StatusRed
 import java.text.SimpleDateFormat
@@ -237,8 +239,8 @@ private fun categoryColor(c: EventCategory): Color = when (c) {
     EventCategory.BARKING -> StatusRed
     EventCategory.MOVEMENT -> StatusAmber
     EventCategory.DOG -> StatusGreen
-    EventCategory.HAZARD -> Color(0xFFFF6B35)
-    EventCategory.SYSTEM -> Color(0xFF7D8A96)
+    EventCategory.HAZARD -> HazardCoral
+    EventCategory.SYSTEM -> SystemGrey
 }
 
 /**
