@@ -29,6 +29,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.ui.unit.dp
 import com.laddu.app.core.model.AppMode
 import com.laddu.app.core.ui.components.LadduLogo
@@ -54,23 +60,42 @@ fun SplashContent(modifier: Modifier = Modifier) {
 @Composable
 fun WelcomeContent(onGetStarted: () -> Unit, modifier: Modifier = Modifier) {
     Column(
-        modifier.fillMaxSize().safeDrawingPadding().padding(28.dp).testTag("welcome"),
+        modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(horizontal = 28.dp, vertical = 24.dp).testTag("welcome"),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        LadduLogo(140.dp)
-        Spacer(Modifier.height(28.dp))
-        Text("Welcome to Laddu", style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center)
-        Spacer(Modifier.height(12.dp))
+        LadduLogo(120.dp)
+        Spacer(Modifier.height(24.dp))
+        Text("Meet Laddu", style = MaterialTheme.typography.headlineLarge, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(8.dp))
         Text(
-            "Turn an old phone into an AI-powered dog camera, and watch your dog from anywhere with another phone.",
+            "Turn an old phone into a smart dog camera, and keep an eye on your best friend from anywhere.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
-        Spacer(Modifier.height(40.dp))
-        Button(onClick = onGetStarted, modifier = Modifier.fillMaxWidth().height(52.dp).testTag("get_started")) {
-            Text("Get started")
+        Spacer(Modifier.height(28.dp))
+        Feature(androidx.compose.material.icons.Icons.Filled.Videocam, "Watch live", "See your dog in real time from your own phone.")
+        Feature(androidx.compose.material.icons.Icons.Filled.Notifications, "Know what happens", "Alerts for barking, movement and possible hazards.")
+        Feature(androidx.compose.material.icons.Icons.Filled.Shield, "Stay private", "Detection runs on the camera phone. Nothing is recorded in secret.")
+        Spacer(Modifier.height(32.dp))
+        Button(onClick = onGetStarted, modifier = Modifier.fillMaxWidth().height(56.dp).testTag("get_started")) {
+            Text("Get started", style = MaterialTheme.typography.titleMedium)
+        }
+    }
+}
+
+@Composable
+private fun Feature(icon: ImageVector, title: String, body: String) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        androidx.compose.foundation.layout.Box(
+            Modifier.size(48.dp).clip(androidx.compose.foundation.shape.CircleShape).background(MaterialTheme.colorScheme.primaryContainer),
+            contentAlignment = Alignment.Center,
+        ) { Icon(icon, null, tint = MaterialTheme.colorScheme.primary) }
+        Spacer(Modifier.width(16.dp))
+        Column {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }
@@ -134,17 +159,21 @@ private fun ModeCard(
             if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
         ),
         colors = CardDefaults.cardColors(
-            containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+            containerColor = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
         ),
     ) {
         Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, Modifier.size(40.dp), tint = MaterialTheme.colorScheme.primary)
+            androidx.compose.foundation.layout.Box(
+                Modifier.size(56.dp).clip(androidx.compose.foundation.shape.CircleShape).background(MaterialTheme.colorScheme.background.copy(alpha = 0.5f)),
+                contentAlignment = Alignment.Center,
+            ) { Icon(icon, null, Modifier.size(30.dp), tint = MaterialTheme.colorScheme.primary) }
             Spacer(Modifier.width(16.dp))
-            Column {
-                Text("$emoji  $title", style = MaterialTheme.typography.titleLarge)
+            Column(Modifier.weight(1f)) {
+                Text(title, style = MaterialTheme.typography.titleLarge)
                 Spacer(Modifier.height(4.dp))
                 Text(body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
+            if (selected) Icon(androidx.compose.material.icons.Icons.Filled.CheckCircle, "Selected", tint = MaterialTheme.colorScheme.primary)
         }
     }
 }
