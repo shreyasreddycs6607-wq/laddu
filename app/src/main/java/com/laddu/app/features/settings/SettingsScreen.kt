@@ -62,6 +62,7 @@ class SettingsActions(
     val signOut: () -> Unit,
     val switchMode: () -> Unit,
     val openOemGuide: () -> Unit,
+    val updateSafety: ((com.laddu.app.core.safety.SafetyPolicy) -> com.laddu.app.core.safety.SafetyPolicy) -> Unit = {},
     val manageCamera: () -> Unit,
 )
 
@@ -79,12 +80,13 @@ fun SettingsScreen(
             vm::updateCamera, vm::updateNotifications, vm::updateRecording, vm::updateNetwork, vm::setTheme, vm::deleteRecordings,
             restartCamera = { if (vm.ui.value.mode == AppMode.VIEWER) vm.restartRemoteCamera() else vm.restartLocalMonitoring() },
             signOut = { vm.signOut(onSignedOut) }, switchMode = { vm.switchMode(onModeSwitched) },
-            openOemGuide = onOemGuide, manageCamera = onManageCamera,
+            openOemGuide = onOemGuide, manageCamera = onManageCamera, updateSafety = vm::updateSafety,
         )
     }
     SettingsContent(ui, actions)
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun SettingsContent(ui: SettingsUi, a: SettingsActions, modifier: Modifier = Modifier) {
     val viewer = ui.mode == AppMode.VIEWER
@@ -153,7 +155,46 @@ fun SettingsContent(ui: SettingsUi, a: SettingsActions, modifier: Modifier = Mod
             SwitchRow("Camera offline", n.cameraOffline, true) { v -> a.updateNotifications { it.copy(cameraOffline = v) } }
             SwitchRow("Camera online", n.cameraOnline, true) { v -> a.updateNotifications { it.copy(cameraOnline = v) } }
             SwitchRow("Low battery", n.lowBattery, true) { v -> a.updateNotifications { it.copy(lowBattery = v) } }
+            SwitchRow("Pet-safety alerts (hazards)", n.hazards, true, "sw_n_hazard") { v -> a.updateNotifications { it.copy(hazards = v) } }
             StepperRow("Minimum seconds between similar alerts", n.cooldownSec, 0..900, true, step = 30) { v -> a.updateNotifications { it.copy(cooldownSec = v) } }
+        }
+
+        // ---------------- Pet safety (hazards)
+        SectionTitle("Pet safety")
+        InfoCard {
+            if (viewer) {
+                Text("Pet-safety rules live on the camera phone. Open Laddu there to change them.", style = MaterialTheme.typography.bodyMedium)
+            } else {
+                val p = ui.safety
+                SwitchRow("Watch for hazards", p.enabled, true, "sw_safety") { v -> a.updateSafety { it.copy(enabled = v) } }
+                SliderRow("Hazard sensitivity", p.sensitivity, p.enabled, "slider_safety") { v -> a.updateSafety { it.copy(sensitivity = v) } }
+                SwitchRow("Alert on unidentified objects", p.unknownObjectAlerts, p.enabled) { v -> a.updateSafety { it.copy(unknownObjectAlerts = v) } }
+                Text(
+                    "Laddu reports what the camera appears to show, with uncertainty. It cannot confirm that anything was swallowed " +
+                        "and does not replace watching your dog or veterinary advice.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
+                p.items.filter { it.id != "unknown" }.forEach { item ->
+                    Column(Modifier.padding(vertical = 6.dp)) {
+                        Text(item.name, style = MaterialTheme.typography.bodyLarge)
+                        if (item.id in com.laddu.app.core.safety.DefaultSafety.needsCustomModel) {
+                            Text("Needs a model that can recognise this (the bundled one cannot).", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf(
+                                com.laddu.app.core.safety.Approval.APPROVED to "Approved",
+                                com.laddu.app.core.safety.Approval.RESTRICTED to "Restricted",
+                                com.laddu.app.core.safety.Approval.HAZARDOUS to "Hazardous",
+                            ).forEach { (ap, label) ->
+                                com.laddu.app.core.ui.components.ChoiceChip(item.approval == ap, {
+                                    a.updateSafety { pol -> pol.copy(items = pol.items.map { i -> if (i.id == item.id) i.copy(approval = ap, risk = if (ap != com.laddu.app.core.safety.Approval.APPROVED && i.risk == com.laddu.app.core.safety.RiskLevel.INFO) com.laddu.app.core.safety.RiskLevel.CAUTION else i.risk, updatedAtMs = System.currentTimeMillis()) else i }) }
+                                }, label, enabled = p.enabled)
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // ---------------- Recording

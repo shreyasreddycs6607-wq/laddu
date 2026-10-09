@@ -106,6 +106,9 @@ object DefaultSafety {
         id: String, name: String, c: HazardCategory, a: Approval, r: RiskLevel, vararg labels: String, notes: String = "",
     ) = SafetyItem(id, name, c, a, r, labels.map { it.lowercase() }.toSet(), notes = notes)
 
+    /** Default items whose labels the bundled COCO detector cannot output; they need a custom / open-vocabulary model. */
+    val needsCustomModel: Set<String> = setOf("rubbish", "toxic_food", "faeces", "unknown")
+
     val items: List<SafetyItem> = listOf(
         // --- visible with the bundled COCO detector
         item("bottle", "Bottle (possibly plastic)", HazardCategory.PLASTIC, Approval.RESTRICTED, RiskLevel.CAUTION, "bottle"),

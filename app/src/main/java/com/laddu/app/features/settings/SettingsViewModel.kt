@@ -53,6 +53,7 @@ data class SettingsUi(
     val androidVersion: String = "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
     val appVersion: String = BuildConfig.VERSION_NAME,
     val cameraId: String = "",
+    val safety: com.laddu.app.core.safety.SafetyPolicy = com.laddu.app.core.safety.SafetyPolicy(),
 )
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -89,14 +90,16 @@ class SettingsViewModel @Inject constructor(
     private fun refreshUsedMb() { viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) { usedMb.value = clips.usedBytes() / (1024 * 1024) } }
     init { refreshUsedMb() }
 
-    val ui: StateFlow<SettingsUi> = combine(base, rest, remoteCamera, usedMb) { b, r, rc, used ->
+    private val safety = settings.safetyPolicy.onStart { emit(com.laddu.app.core.safety.SafetyPolicy()) }
+
+    val ui: StateFlow<SettingsUi> = combine(base, rest, remoteCamera, usedMb, safety) { b, r, rc, used, pol ->
         val viewer = b.mode == AppMode.VIEWER
         SettingsUi(
             mode = b.mode, email = b.email, theme = b.theme,
             camera = if (viewer) (rc?.second?.first ?: CameraSettings()) else b.local,
             notif = b.notif, recording = r.rec, network = r.net,
             remoteCameraName = rc?.third?.name, remoteReady = viewer && rc?.second != null,
-            storageUsedMb = used,
+            storageUsedMb = used, safety = pol,
             health = r.health, firebaseConfigured = fb.isConfigured,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), SettingsUi())
@@ -116,6 +119,10 @@ class SettingsViewModel @Inject constructor(
             val uid = auth.currentUid ?: return@launch
             remote.pushNotificationPrefs(uid, settings.notificationPrefs.first())
         }
+    }
+
+    fun updateSafety(transform: (com.laddu.app.core.safety.SafetyPolicy) -> com.laddu.app.core.safety.SafetyPolicy) {
+        viewModelScope.launch { settings.updateSafetyPolicy(transform) }
     }
 
     fun updateRecording(transform: (RecordingSettings) -> RecordingSettings) { viewModelScope.launch { settings.updateRecording(transform) } }
