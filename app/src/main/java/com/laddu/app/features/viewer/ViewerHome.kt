@@ -117,6 +117,7 @@ fun ViewerHomeContent(
                     }
                 }
 
+                Spacer(Modifier.height(22.dp))
                 SectionHeader("Today", null)
                 InfoCard(Modifier.testTag("today_stats")) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
