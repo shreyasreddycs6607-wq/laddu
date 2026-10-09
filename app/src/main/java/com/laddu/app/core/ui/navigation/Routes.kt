@@ -23,6 +23,7 @@ object Routes {
     const val VIEWER_LIVE = "viewer/live"
     const val VIEWER_ALERTS = "viewer/alerts"
     const val VIEWER_ACTIVITY = "viewer/activity"
+    const val VIEWER_ASSISTANT = "viewer/assistant"
     const val VIEWER_SETTINGS = "viewer/settings"
     const val ADD_CAMERA = "viewer/add_camera"
     const val MANAGE_CAMERA = "viewer/manage_camera"
