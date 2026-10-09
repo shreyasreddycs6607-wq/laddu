@@ -67,6 +67,14 @@ sealed interface ModelSource {
 }
 
 object ModelLocator {
+    /** Memory-maps a model so the interpreter can read it without copying it onto the Java heap. */
+    fun map(ctx: Context, source: ModelSource): java.nio.MappedByteBuffer = when (source) {
+        is ModelSource.InFile -> java.io.FileInputStream(source.file).use { f -> f.channel.map(java.nio.channels.FileChannel.MapMode.READ_ONLY, 0, f.channel.size()) }
+        is ModelSource.InAssets -> ctx.assets.openFd(source.path).use { fd ->
+            java.io.FileInputStream(fd.fileDescriptor).channel.map(java.nio.channels.FileChannel.MapMode.READ_ONLY, fd.startOffset, fd.declaredLength)
+        }
+    }
+
     fun locate(ctx: Context, name: String): ModelSource? {
         val f = File(File(ctx.filesDir, "models"), name)
         if (f.isFile && f.length() > 0) return ModelSource.InFile(f)
