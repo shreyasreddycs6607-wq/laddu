@@ -37,6 +37,12 @@ data class AlertPayload(
             EventType.CAMERA_OFFLINE -> "📴 Camera offline"
             EventType.CAMERA_ONLINE -> "✅ Camera online"
             EventType.LOW_BATTERY -> "🔋 Camera battery low"
+            EventType.POSSIBLE_INGESTION -> "⚠️ Possible ingestion"
+            EventType.POSSIBLE_CHEWING -> "⚠️ Possible chewing of a hazard"
+            EventType.HIGH_RISK_OBJECT_INTERACTION -> "⚠️ High-risk object interaction"
+            EventType.UNKNOWN_OBJECT_NEAR_MOUTH -> "⚠️ Unidentified object near your dog"
+            EventType.DOG_APPROACHING_HAZARD -> "👀 Dog approaching a hazard"
+            EventType.POSSIBLE_HAZARD_INTERACTION -> "⚠️ Possible hazard interaction"
         }
     }
 }
@@ -53,6 +59,10 @@ class NotificationPolicy @javax.inject.Inject constructor() {
         EventType.REPEATED_BARK -> 10 * 60_000L
         EventType.LOW_BATTERY -> 30 * 60_000L
         EventType.CAMERA_OFFLINE, EventType.CAMERA_ONLINE -> 30_000L
+        // The hazard engine already collapses one incident into one alert and escalates deliberately; keep the
+        // phone-side cooldown short so a genuine escalation is never swallowed.
+        EventType.DOG_APPROACHING_HAZARD, EventType.POSSIBLE_HAZARD_INTERACTION, EventType.POSSIBLE_CHEWING,
+        EventType.POSSIBLE_INGESTION, EventType.HIGH_RISK_OBJECT_INTERACTION, EventType.UNKNOWN_OBJECT_NEAR_MOUTH -> 10_000L
         else -> prefs.cooldownSec * 1000L
     }
 

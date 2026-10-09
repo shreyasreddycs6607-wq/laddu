@@ -37,6 +37,7 @@ class SettingsRepository @Inject constructor(private val store: DataStore<Prefer
         val camera = stringPreferencesKey("camera_settings")
         val notif = stringPreferencesKey("notification_prefs")
         val recording = stringPreferencesKey("recording_settings")
+        val safety = stringPreferencesKey("safety_policy")
         val network = stringPreferencesKey("network_settings")
         val oemGuideSeen = booleanPreferencesKey("oem_guide_seen")
         val localOnly = booleanPreferencesKey("local_only")
@@ -57,6 +58,7 @@ class SettingsRepository @Inject constructor(private val store: DataStore<Prefer
     val cameraSettings: Flow<CameraSettings> = json(K.camera, CameraSettings::fromJson)
     val notificationPrefs: Flow<NotificationPrefs> = json(K.notif, NotificationPrefs::fromJson)
     val recordingSettings: Flow<RecordingSettings> = json(K.recording, RecordingSettings::fromJson)
+    val safetyPolicy: Flow<com.laddu.app.core.safety.SafetyPolicy> = json(K.safety, com.laddu.app.core.safety.SafetyPolicy::fromJson)
     val networkSettings: Flow<NetworkSettings> = json(K.network, NetworkSettings::fromJson)
 
     suspend fun setAppMode(mode: AppMode) = store.edit { it[K.mode] = mode.name; it[K.onboarded] = true }
@@ -97,6 +99,11 @@ class SettingsRepository @Inject constructor(private val store: DataStore<Prefer
     suspend fun updateNotifications(transform: (NotificationPrefs) -> NotificationPrefs) = store.edit { p ->
         val cur = NotificationPrefs.fromJson(p[K.notif]?.let { runCatching { JSONObject(it) }.getOrNull() })
         p[K.notif] = transform(cur).toJson().toString()
+    }
+
+    suspend fun updateSafetyPolicy(transform: (com.laddu.app.core.safety.SafetyPolicy) -> com.laddu.app.core.safety.SafetyPolicy) = store.edit { p ->
+        val cur = com.laddu.app.core.safety.SafetyPolicy.fromJson(p[K.safety]?.let { runCatching { JSONObject(it) }.getOrNull() })
+        p[K.safety] = transform(cur).toJson().toString()
     }
 
     suspend fun updateRecording(transform: (RecordingSettings) -> RecordingSettings) = store.edit { p ->

@@ -24,6 +24,8 @@ class FramePipeline(
 ) : FrameConsumer {
 
     @Volatile var settings: CameraSettings = CameraSettings()
+    /** Optional hazard logic fed from the same inference pass (set by the service). */
+    @Volatile var hazard: com.laddu.app.core.safety.HazardEngine? = null
     @Volatile var profile: AiProfile = profileFor(settings.aiMode, com.laddu.app.core.model.ThermalLevel.NORMAL)
 
     private val motion = MotionDetector()
@@ -82,10 +84,17 @@ class FramePipeline(
 
     private fun infer(bmp: Bitmap, now: Long, possibleMotion: Boolean, motionResult: MotionResult, s: CameraSettings) {
         val t0 = System.nanoTime()
-        val detections = dog.detect(bmp, now)
+        val scene = dog.detectScene(bmp, now)
+        val detections = scene.dogs
         lastInferenceMs = (System.nanoTime() - t0) / 1_000_000
         inferenceCount++
         val tracks = tracker.update(detections, now)
+        // Hazard logic runs on every inference (even with no dog in view) so its incidents can end; with no dog tracks
+        // or no model it simply reports nothing.
+        hazard?.let { h ->
+            val outs = runCatching { h.onFrame(tracks, scene.objects, now) }.getOrDefault(emptyList())
+            if (outs.isNotEmpty()) emit(EngineInput.Hazard(now, outs))
+        }
 
         if (detections.isNotEmpty()) {
             emit(EngineInput.DogSeen(now, detections.maxOf { it.confidence }))
@@ -114,7 +123,7 @@ class FramePipeline(
 
     /** Called from the service thread; each piece of state is reset on the thread that owns it. */
     fun reset() {
-        runCatching { executor.execute { tracker.reset() } }
+        runCatching { executor.execute { tracker.reset(); hazard?.reset() } }
         motionResetRequested = true
     }
 

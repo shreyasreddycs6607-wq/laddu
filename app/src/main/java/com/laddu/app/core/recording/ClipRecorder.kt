@@ -113,6 +113,8 @@ class ClipRecorder @Inject constructor(
     private fun shouldRecord(t: EventType) = when (t) {
         EventType.BARK, EventType.REPEATED_BARK, EventType.HOWL, EventType.MOVEMENT -> true
         EventType.DOG_PRESENCE -> true
+        EventType.DOG_APPROACHING_HAZARD, EventType.POSSIBLE_HAZARD_INTERACTION, EventType.POSSIBLE_CHEWING,
+        EventType.POSSIBLE_INGESTION, EventType.HIGH_RISK_OBJECT_INTERACTION, EventType.UNKNOWN_OBJECT_NEAR_MOUTH -> true
         else -> false
     }
 

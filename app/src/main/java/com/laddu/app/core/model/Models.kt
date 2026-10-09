@@ -3,7 +3,7 @@ package com.laddu.app.core.model
 /** Role a phone plays. Persisted so the app reopens in the right mode. */
 enum class AppMode { CAMERA, VIEWER }
 
-enum class EventCategory { DOG, MOVEMENT, BARKING, SYSTEM }
+enum class EventCategory { DOG, MOVEMENT, BARKING, HAZARD, SYSTEM }
 
 enum class EventType(val category: EventCategory, val label: String) {
     DOG_PRESENCE(EventCategory.DOG, "Dog presence"),
@@ -13,7 +13,15 @@ enum class EventType(val category: EventCategory, val label: String) {
     HOWL(EventCategory.BARKING, "Howling"),
     CAMERA_OFFLINE(EventCategory.SYSTEM, "Camera offline"),
     CAMERA_ONLINE(EventCategory.SYSTEM, "Camera online"),
-    LOW_BATTERY(EventCategory.SYSTEM, "Low battery");
+    LOW_BATTERY(EventCategory.SYSTEM, "Low battery"),
+
+    // Hazard / safety events (see core/safety). All are observations with uncertainty, never confirmed diagnoses.
+    DOG_APPROACHING_HAZARD(EventCategory.HAZARD, "Dog approaching a hazard"),
+    POSSIBLE_HAZARD_INTERACTION(EventCategory.HAZARD, "Possible hazard interaction"),
+    POSSIBLE_CHEWING(EventCategory.HAZARD, "Possible chewing"),
+    POSSIBLE_INGESTION(EventCategory.HAZARD, "Possible ingestion"),
+    HIGH_RISK_OBJECT_INTERACTION(EventCategory.HAZARD, "High-risk object interaction"),
+    UNKNOWN_OBJECT_NEAR_MOUTH(EventCategory.HAZARD, "Unidentified object near the dog");
 
     companion object {
         fun parse(raw: String?): EventType? = entries.firstOrNull { it.name == raw }

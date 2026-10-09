@@ -193,6 +193,7 @@ class CameraMonitoringService : LifecycleService() {
     private lateinit var engine: EventEngine
     private lateinit var inputs: Channel<EngineInput>
     private lateinit var framePipeline: FramePipeline
+    private var hazardEngine: com.laddu.app.core.safety.HazardEngine? = null
     private lateinit var barkPipeline: BarkPipeline
     private lateinit var audio: AudioCapture
     private lateinit var windower: AudioWindower
@@ -222,6 +223,8 @@ class CameraMonitoringService : LifecycleService() {
 
         framePipeline = FramePipeline(dogEngine, emit) { box -> holder.update { it.copy(dogBox = box) } }
         framePipeline.settings = current
+        hazardEngine = com.laddu.app.core.safety.HazardEngine(cameraId, ownerId, settings.safetyPolicy.first())
+        framePipeline.hazard = hazardEngine
         barkPipeline = BarkPipeline(barkEngine, emit)
         barkPipeline.settings = current
         // Inference must not run on the audio producer thread (during live view that is WebRTC's capture thread, and
@@ -286,6 +289,7 @@ class CameraMonitoringService : LifecycleService() {
                 updateAudio(s)
             }
         }
+        scope.launch { settings.safetyPolicy.collect { hazardEngine?.policy = it } } // edits apply live
         scope.launch {
             var baseline: Long? = null
             var lastRemote = -1L // compare stamps, not clocks: the camera's and the viewer's clocks differ
@@ -470,6 +474,7 @@ class CameraMonitoringService : LifecycleService() {
             running?.join()
             if (::engine.isInitialized) {
                 runCatching { processor.handle(engine.flush(System.currentTimeMillis())) }
+                hazardEngine?.let { h -> runCatching { processor.handle(h.flush(System.currentTimeMillis())) } }
             }
             if (cameraId.isNotEmpty()) {
                 runCatching { devices.heartbeat(cameraId, currentStatus(false)) }

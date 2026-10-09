@@ -57,6 +57,8 @@ sealed interface EngineInput {
     data class BatteryChanged(override val ts: Long, val pct: Int, val charging: Boolean) : EngineInput
     /** Heartbeat so timers can expire when no samples arrive. Call about once a second. */
     data class Tick(override val ts: Long) : EngineInput
+    /** Events already produced by the hazard engine (core/safety); the event engine passes them through unchanged. */
+    data class Hazard(override val ts: Long, val outputs: List<EngineOutput>) : EngineInput
 }
 
 /** What happened to a logical event. The same eventId appears in STARTED then COMPLETED. */
@@ -299,6 +301,7 @@ class EventEngine(
             is EngineInput.NetworkChanged -> onNetwork(input, out)
             is EngineInput.BatteryChanged -> onBattery(input, out)
             is EngineInput.Tick -> Unit
+            is EngineInput.Hazard -> out += input.outputs
         }
         return out
     }

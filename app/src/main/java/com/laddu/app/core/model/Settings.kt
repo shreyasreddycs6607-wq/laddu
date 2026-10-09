@@ -78,13 +78,15 @@ data class NotificationPrefs(
     val cameraOffline: Boolean = true,
     val cameraOnline: Boolean = true,
     val lowBattery: Boolean = true,
+    /** Pet-safety (hazard) alerts. On by default: they are the most important ones. */
+    val hazards: Boolean = true,
     /** Minimum seconds between two notifications of the same type. */
     val cooldownSec: Int = 120,
 ) {
     fun toJson() = JSONObject().apply {
         put("barking", barking); put("repeatedBarking", repeatedBarking); put("movement", movement)
         put("dogReturned", dogReturned); put("cameraOffline", cameraOffline)
-        put("cameraOnline", cameraOnline); put("lowBattery", lowBattery); put("cooldownSec", cooldownSec)
+        put("cameraOnline", cameraOnline); put("lowBattery", lowBattery); put("hazards", hazards); put("cooldownSec", cooldownSec)
     }
 
     fun toMap(): Map<String, Any> = toJson().let { j -> j.keys().asSequence().associateWith { j.get(it) } }
@@ -97,6 +99,8 @@ data class NotificationPrefs(
         EventType.CAMERA_OFFLINE -> cameraOffline
         EventType.CAMERA_ONLINE -> cameraOnline
         EventType.LOW_BATTERY -> lowBattery
+        EventType.DOG_APPROACHING_HAZARD, EventType.POSSIBLE_HAZARD_INTERACTION, EventType.POSSIBLE_CHEWING,
+        EventType.POSSIBLE_INGESTION, EventType.HIGH_RISK_OBJECT_INTERACTION, EventType.UNKNOWN_OBJECT_NEAR_MOUTH -> hazards
     }
 
     companion object {
@@ -111,6 +115,7 @@ data class NotificationPrefs(
                 cameraOffline = j.optBoolean("cameraOffline", d.cameraOffline),
                 cameraOnline = j.optBoolean("cameraOnline", d.cameraOnline),
                 lowBattery = j.optBoolean("lowBattery", d.lowBattery),
+                hazards = j.optBoolean("hazards", d.hazards),
                 cooldownSec = j.optInt("cooldownSec", d.cooldownSec).coerceIn(0, 3600),
             )
         }

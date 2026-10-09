@@ -105,10 +105,11 @@ import java.text.DateFormat
 import java.util.Date
 import javax.inject.Inject
 
-enum class AlertFilter(val label: String) { ALL("All"), BARKING("Barking"), MOVEMENT("Movement"), DOG("Dog"), SYSTEM("System") }
+enum class AlertFilter(val label: String) { ALL("All"), SAFETY("Safety"), BARKING("Barking"), MOVEMENT("Movement"), DOG("Dog"), SYSTEM("System") }
 
 fun List<LadduEvent>.filtered(f: AlertFilter): List<LadduEvent> = when (f) {
     AlertFilter.ALL -> this
+    AlertFilter.SAFETY -> filter { it.type.category == EventCategory.HAZARD }
     AlertFilter.BARKING -> filter { it.type.category == EventCategory.BARKING }
     AlertFilter.MOVEMENT -> filter { it.type.category == EventCategory.MOVEMENT }
     AlertFilter.DOG -> filter { it.type.category == EventCategory.DOG }
@@ -219,12 +220,15 @@ fun eventIcon(t: EventType): ImageVector = when (t) {
     EventType.CAMERA_OFFLINE -> Icons.Filled.VideocamOff
     EventType.CAMERA_ONLINE -> Icons.Filled.Videocam
     EventType.LOW_BATTERY -> Icons.Filled.BatteryAlert
+    EventType.POSSIBLE_INGESTION, EventType.POSSIBLE_CHEWING, EventType.HIGH_RISK_OBJECT_INTERACTION,
+    EventType.POSSIBLE_HAZARD_INTERACTION, EventType.UNKNOWN_OBJECT_NEAR_MOUTH, EventType.DOG_APPROACHING_HAZARD -> Icons.Filled.Warning
 }
 
 private fun categoryColor(c: EventCategory): Color = when (c) {
     EventCategory.BARKING -> StatusRed
     EventCategory.MOVEMENT -> StatusAmber
     EventCategory.DOG -> StatusGreen
+    EventCategory.HAZARD -> Color(0xFFFF6B35)
     EventCategory.SYSTEM -> Color(0xFF7D8A96)
 }
 

@@ -12,6 +12,9 @@ import org.tensorflow.lite.task.vision.detector.ObjectDetector
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** What one inference pass saw: dogs (at the dog confidence the user chose) and every other labelled object. */
+data class Scene(val dogs: List<Detection>, val objects: List<Detection>)
+
 /** Replaceable dog detector. Implementations must be called from ONE thread at a time. */
 interface DogDetectionEngine {
     val status: StateFlow<ModelStatus>
@@ -22,6 +25,12 @@ interface DogDetectionEngine {
     /** Detect dogs in an *upright* bitmap. Returns only dog detections (no fake results ever). */
     fun detect(bitmap: Bitmap, timestampMs: Long): List<Detection>
 
+    /**
+     * Dogs plus other objects from the same inference (used by hazard detection). Engines that only know dogs keep
+     * the default: no objects, never a made-up one.
+     */
+    fun detectScene(bitmap: Bitmap, timestampMs: Long): Scene = Scene(detect(bitmap, timestampMs), emptyList())
+
     fun close()
 }
 
@@ -30,6 +39,9 @@ interface DogDetectionEngine {
  * Works with any object-detection `.tflite` that carries TFLite metadata (EfficientDet-Lite,
  * SSD MobileNet...). The model must have a "dog" label - COCO-trained models do.
  */
+/** Objects are detected down to this score; the owner's dog sensitivity still applies to dogs. */
+private const val OBJECT_MIN_CONFIDENCE = 0.35f
+
 @Singleton
 class TfliteDogDetectionEngine @Inject constructor(
     @ApplicationContext private val ctx: Context,
@@ -51,7 +63,7 @@ class TfliteDogDetectionEngine @Inject constructor(
         return try {
             val opts = ObjectDetector.ObjectDetectorOptions.builder()
                 .setMaxResults(20) // a furnished room has many objects; a dog must not be cut off by the top-N
-                .setScoreThreshold(minConfidence)
+                .setScoreThreshold(minOf(minConfidence, OBJECT_MIN_CONFIDENCE))
                 .setBaseOptions(BaseOptions.builder().setNumThreads(threads).build())
                 .build()
             detector = when (source) {
@@ -69,16 +81,19 @@ class TfliteDogDetectionEngine @Inject constructor(
     }
 
     @Synchronized
-    override fun detect(bitmap: Bitmap, timestampMs: Long): List<Detection> {
-        val d = detector ?: return emptyList()
+    override fun detect(bitmap: Bitmap, timestampMs: Long): List<Detection> = detectScene(bitmap, timestampMs).dogs
+
+    @Synchronized
+    override fun detectScene(bitmap: Bitmap, timestampMs: Long): Scene {
+        val d = detector ?: return Scene(emptyList(), emptyList())
         val w = bitmap.width.toFloat(); val h = bitmap.height.toFloat()
-        val results = d.detect(TensorImage.fromBitmap(bitmap))
-        return results.mapNotNull { r ->
-            val cat = r.categories.firstOrNull() ?: return@mapNotNull null
-            if (!cat.label.equals("dog", ignoreCase = true)) return@mapNotNull null
+        val dogs = ArrayList<Detection>()
+        val objects = ArrayList<Detection>()
+        for (r in d.detect(TensorImage.fromBitmap(bitmap))) {
+            val cat = r.categories.firstOrNull() ?: continue
             val b = r.boundingBox
-            Detection(
-                label = "dog",
+            val det = Detection(
+                label = cat.label.lowercase(),
                 confidence = cat.score,
                 box = BoundingBox(
                     (b.left / w).coerceIn(0f, 1f), (b.top / h).coerceIn(0f, 1f),
@@ -86,7 +101,9 @@ class TfliteDogDetectionEngine @Inject constructor(
                 ),
                 timestampMs = timestampMs,
             )
+            if (det.label == "dog") { if (det.confidence >= loadedConfidence) dogs += det } else objects += det
         }
+        return Scene(dogs, objects)
     }
 
     @Synchronized
