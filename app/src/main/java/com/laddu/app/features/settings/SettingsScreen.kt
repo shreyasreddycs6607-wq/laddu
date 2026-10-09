@@ -156,6 +156,11 @@ fun SettingsContent(ui: SettingsUi, a: SettingsActions, modifier: Modifier = Mod
             SwitchRow("Camera online", n.cameraOnline, true) { v -> a.updateNotifications { it.copy(cameraOnline = v) } }
             SwitchRow("Low battery", n.lowBattery, true) { v -> a.updateNotifications { it.copy(lowBattery = v) } }
             SwitchRow("Pet-safety alerts (hazards)", n.hazards, true, "sw_n_hazard") { v -> a.updateNotifications { it.copy(hazards = v) } }
+            SwitchRow("Quiet hours (high-risk hazards still alert)", n.quietHours, true, "sw_quiet") { v -> a.updateNotifications { it.copy(quietHours = v) } }
+            if (n.quietHours) {
+                StepperRow("Quiet from (hour, 24h)", n.quietStartMin / 60, 0..23, true) { v -> a.updateNotifications { it.copy(quietStartMin = v * 60) } }
+                StepperRow("Quiet until (hour, 24h)", n.quietEndMin / 60, 0..23, true) { v -> a.updateNotifications { it.copy(quietEndMin = v * 60) } }
+            }
             StepperRow("Minimum seconds between similar alerts", n.cooldownSec, 0..900, true, step = 30) { v -> a.updateNotifications { it.copy(cooldownSec = v) } }
         }
 

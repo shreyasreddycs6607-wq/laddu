@@ -80,13 +80,18 @@ data class NotificationPrefs(
     val lowBattery: Boolean = true,
     /** Pet-safety (hazard) alerts. On by default: they are the most important ones. */
     val hazards: Boolean = true,
+    /** Quiet hours silence everything except high-risk hazards. Minutes after midnight. */
+    val quietHours: Boolean = false,
+    val quietStartMin: Int = 22 * 60,
+    val quietEndMin: Int = 7 * 60,
     /** Minimum seconds between two notifications of the same type. */
     val cooldownSec: Int = 120,
 ) {
     fun toJson() = JSONObject().apply {
         put("barking", barking); put("repeatedBarking", repeatedBarking); put("movement", movement)
         put("dogReturned", dogReturned); put("cameraOffline", cameraOffline)
-        put("cameraOnline", cameraOnline); put("lowBattery", lowBattery); put("hazards", hazards); put("cooldownSec", cooldownSec)
+        put("cameraOnline", cameraOnline); put("lowBattery", lowBattery); put("hazards", hazards); put("quietHours", quietHours)
+        put("quietStartMin", quietStartMin); put("quietEndMin", quietEndMin); put("cooldownSec", cooldownSec)
     }
 
     fun toMap(): Map<String, Any> = toJson().let { j -> j.keys().asSequence().associateWith { j.get(it) } }
@@ -116,6 +121,9 @@ data class NotificationPrefs(
                 cameraOnline = j.optBoolean("cameraOnline", d.cameraOnline),
                 lowBattery = j.optBoolean("lowBattery", d.lowBattery),
                 hazards = j.optBoolean("hazards", d.hazards),
+                quietHours = j.optBoolean("quietHours", d.quietHours),
+                quietStartMin = j.optInt("quietStartMin", d.quietStartMin).coerceIn(0, 1439),
+                quietEndMin = j.optInt("quietEndMin", d.quietEndMin).coerceIn(0, 1439),
                 cooldownSec = j.optInt("cooldownSec", d.cooldownSec).coerceIn(0, 3600),
             )
         }

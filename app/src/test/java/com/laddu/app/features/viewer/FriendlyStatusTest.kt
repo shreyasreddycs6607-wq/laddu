@@ -19,6 +19,11 @@ class FriendlyStatusTest {
         assertTrue(!t.contains("sleep"))
     }
 
+    @Test fun `walking and running are described as observations`() {
+        assertTrue(friendlyStatus(true, CameraStatus(dogPresent = true, activity = "WALKING")).contains("walking-like"))
+        assertTrue(friendlyStatus(true, CameraStatus(dogPresent = true, activity = "RUNNING")).contains("running-like"))
+    }
+
     @Test fun `calm dog in view`() {
         assertTrue(friendlyStatus(true, CameraStatus(dogPresent = true)).contains("calm"))
     }

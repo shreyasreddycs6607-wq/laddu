@@ -126,6 +126,7 @@ async function pushEvent(eventId, ev) {
       body: hazardText(ev, "body", bodyFor(ev.type, ev), 300),
       cameraName: String(cam.name || "Laddu camera"),
       timestamp: String(ev.timestamp || Date.now()),
+      risk: String((ev.metadata && ev.metadata.risk) || ""),
     },
     android: { priority: "high", ttl: 5 * 60 * 1000 },
   };

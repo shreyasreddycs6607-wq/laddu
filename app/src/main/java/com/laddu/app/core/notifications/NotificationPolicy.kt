@@ -12,7 +12,12 @@ data class AlertPayload(
     val body: String,
     val cameraName: String,
     val timestampMs: Long,
+    /** Hazard risk level from the event ("CAUTION", "HIGH", "CRITICAL"), when there is one. */
+    val risk: String? = null,
 ) {
+    /** High-risk hazards are never silenced by quiet hours. */
+    val urgent: Boolean get() = type.category == com.laddu.app.core.model.EventCategory.HAZARD && (risk == "HIGH" || risk == "CRITICAL")
+
     companion object {
         fun fromData(d: Map<String, String>): AlertPayload? {
             val type = EventType.parse(d["type"]) ?: return null
@@ -25,6 +30,7 @@ data class AlertPayload(
                 body = d["body"] ?: type.label,
                 cameraName = d["cameraName"] ?: "Laddu camera",
                 timestampMs = d["timestamp"]?.toLongOrNull() ?: System.currentTimeMillis(),
+                risk = d["risk"]?.takeIf { it.isNotBlank() },
             )
         }
 
@@ -51,6 +57,17 @@ data class AlertPayload(
  * Decides whether a notification may be shown: respects the user's per-type switches and keeps a
  * cooldown per camera+type so a barking dog cannot flood the phone. Pure logic (unit-tested).
  */
+/** Quiet-hours window test; the window may wrap midnight (22:00 to 07:00). */
+object QuietHours {
+    fun isQuiet(prefs: NotificationPrefs, nowMs: Long, zone: java.util.TimeZone = java.util.TimeZone.getDefault()): Boolean {
+        if (!prefs.quietHours || prefs.quietStartMin == prefs.quietEndMin) return false
+        val c = java.util.Calendar.getInstance(zone).apply { timeInMillis = nowMs }
+        val m = c.get(java.util.Calendar.HOUR_OF_DAY) * 60 + c.get(java.util.Calendar.MINUTE)
+        return if (prefs.quietStartMin < prefs.quietEndMin) m in prefs.quietStartMin until prefs.quietEndMin
+        else m >= prefs.quietStartMin || m < prefs.quietEndMin
+    }
+}
+
 @javax.inject.Singleton
 class NotificationPolicy @javax.inject.Inject constructor() {
     private val lastShown = HashMap<String, Long>()
@@ -69,6 +86,7 @@ class NotificationPolicy @javax.inject.Inject constructor() {
     @Synchronized
     fun shouldShow(p: AlertPayload, prefs: NotificationPrefs, nowMs: Long): Boolean {
         if (!prefs.allows(p.type)) return false
+        if (!p.urgent && QuietHours.isQuiet(prefs, nowMs)) return false
         val key = "${p.cameraId}:${p.type}"
         val last = lastShown[key]
         if (last != null && nowMs - last < cooldownMs(p.type, prefs)) return false
