@@ -19,7 +19,7 @@ camerax = "1.4.1"
 work = "2.10.0"
 concurrentFutures = "1.2.0"
 guava = "33.3.1-android"
-tflite = "2.16.1"
+tflite = "1.4.0"
 tfliteTask = "0.4.4"
 webrtc = "125.6422.07"
 zxingCore = "3.5.3"
@@ -82,7 +82,7 @@ concurrent-futures-ktx = { module = "androidx.concurrent:concurrent-futures-ktx"
 guava = { module = "com.google.guava:guava", version.ref = "guava" }
 camerax-view = { module = "androidx.camera:camera-view", version.ref = "camerax" }
 
-tflite = { module = "org.tensorflow:tensorflow-lite", version.ref = "tflite" }
+tflite = { module = "com.google.ai.edge.litert:litert", version.ref = "tflite" }
 tflite-task-vision = { module = "org.tensorflow:tensorflow-lite-task-vision", version.ref = "tfliteTask" }
 
 webrtc = { module = "io.github.webrtc-sdk:android", version.ref = "webrtc" }

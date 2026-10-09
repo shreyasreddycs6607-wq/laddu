@@ -80,7 +80,8 @@ android {
 
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
-        jniLibs.useLegacyPackaging = true
+        // Stored uncompressed and 16 KB aligned in the APK, as Android 15+ 16 KB-page devices require.
+        jniLibs.useLegacyPackaging = false
     }
 
     // Keep .tflite models uncompressed so they can be memory-mapped.
@@ -141,7 +142,6 @@ dependencies {
     implementation(libs.guava)
 
     implementation(libs.tflite)
-    implementation(libs.tflite.task.vision)
 
     implementation(libs.webrtc)
     implementation(libs.zxing.core)
