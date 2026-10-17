@@ -130,12 +130,12 @@ fun CenteredLoading(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun EmptyState(title: String, subtitle: String, modifier: Modifier = Modifier) {
+fun EmptyState(title: String, subtitle: String, modifier: Modifier = Modifier, mood: MascotMood = MascotMood.SLEEPING) {
     Column(
         modifier.fillMaxWidth().padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        LadduLogo(72.dp)
+        LadduMascot(mood, 84.dp)
         Spacer(Modifier.height(16.dp))
         Text(title, style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(4.dp))

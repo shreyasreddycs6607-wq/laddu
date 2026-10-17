@@ -110,3 +110,11 @@ Capture agent with reconnect, health and token auth: **T** (9 Python tests, stre
 
 ## Build and test facts
 Debug and minified release builds succeed. 130 JVM unit tests plus 9 Python tests pass. Instrumented UI tests compile but were not run on a device.
+
+## Puppy mascot (added after the audit above)
+`core/ui/components/Mascot.kt`: Canvas-drawn companion puppy, four moods (happy, curious, sleeping, concerned), blink + tail wag every ~5 s, no assets.
+Stops when the screen isn't resumed or system animations are off; decorative (hidden from TalkBack) unless given a description.
+Used in: empty states, Home greeting (one line per day, concerned when the camera is offline), Live screen while connecting / after failure.
+Status: **built and unit tests still pass; not yet seen on a screen or a device.** Not done from the wider UI brief: other mascot poses
+(magnifying glass, celebrating), success celebrations, shared-element transitions, Lottie, onboarding/profile/device-management redesign,
+cream/forest palette (kept the Teal & Coral palette you chose earlier).

@@ -239,7 +239,14 @@ fun LiveContent(
             }
             if (ui.state != LiveState.LIVE) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
-                    if (ui.state in setOf(LiveState.REQUESTING, LiveState.CONNECTING, LiveState.RECONNECTING)) CircularProgressIndicator(color = Color.White)
+                    val waiting = ui.state in setOf(LiveState.REQUESTING, LiveState.CONNECTING, LiveState.RECONNECTING)
+                    if (waiting || ui.state == LiveState.FAILED) {
+                        com.laddu.app.core.ui.components.LadduMascot(
+                            if (waiting) com.laddu.app.core.ui.components.MascotMood.CURIOUS else com.laddu.app.core.ui.components.MascotMood.CONCERNED, 56.dp,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                    }
+                    if (waiting) CircularProgressIndicator(color = Color.White)
                     Spacer(Modifier.height(10.dp))
                     Text(
                         ui.message ?: when (ui.state) {

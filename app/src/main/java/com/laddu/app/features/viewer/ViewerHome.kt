@@ -55,6 +55,8 @@ import androidx.compose.ui.unit.dp
 import com.laddu.app.core.model.CameraInfo
 import com.laddu.app.core.ui.components.CenteredLoading
 import com.laddu.app.core.ui.components.EmptyState
+import com.laddu.app.core.ui.components.LadduMascot
+import com.laddu.app.core.ui.components.MascotMood
 import com.laddu.app.core.ui.components.InfoCard
 import com.laddu.app.core.ui.components.QuickAction
 import com.laddu.app.core.ui.components.StatusPill
@@ -86,13 +88,14 @@ fun ViewerHomeContent(
             state.loading -> { Wordmark(); CenteredLoading() }
             state.cameras.isEmpty() -> {
                 Wordmark()
-                EmptyState("No camera yet", "Pair your camera phone to start watching your dog from anywhere.")
+                EmptyState("No camera yet", "Pair your camera phone to start watching your dog from anywhere.", mood = MascotMood.CURIOUS)
                 Button(onAddCamera, Modifier.fillMaxWidth().height(52.dp).testTag("add_first_camera")) {
                     Icon(Icons.Filled.AddCircle, null); Spacer(Modifier.width(8.dp)); Text("Add camera")
                 }
             }
             else -> {
                 val cam = state.selected!!
+                Greeting(online = state.online)
                 CameraHeader(state, onSelectCamera)
                 Text(
                     friendlyStatus(state.online, cam.status),
@@ -155,6 +158,27 @@ internal fun friendlyStatus(online: Boolean, s: com.laddu.app.core.model.CameraS
     s.dogPresent && (s.activity == "WALKING" || s.moving) -> "Your dog is in view and moving around (walking-like)."
     s.dogPresent -> "Your dog is in view and calm."
     else -> "All quiet. Your dog is out of the camera's view."
+}
+
+private val GREETINGS = listOf(
+    "Hey! Let's check in on your furry friend.",
+    "Ready to see what your dog has been up to?",
+    "Hello again. Here's the latest from your camera.",
+    "Let's see how things look at home.",
+)
+
+/** Same line all day (index from the date), so returning to the app doesn't reshuffle it. The mascot is decorative. */
+@Composable
+private fun Greeting(online: Boolean) {
+    val line = GREETINGS[java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_YEAR) % GREETINGS.size]
+    Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        LadduMascot(if (online) MascotMood.HAPPY else MascotMood.CONCERNED, 48.dp)
+        Spacer(Modifier.width(12.dp))
+        Text(
+            if (online) line else "The camera isn't responding right now.",
+            style = MaterialTheme.typography.titleMedium, modifier = Modifier.testTag("home_greeting"),
+        )
+    }
 }
 
 @Composable

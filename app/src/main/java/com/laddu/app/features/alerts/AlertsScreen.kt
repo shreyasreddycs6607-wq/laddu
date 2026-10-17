@@ -406,7 +406,7 @@ fun EventDetailContent(ui: EventDetailUi, onBack: () -> Unit, onViewLive: (Strin
         val e = ui.event
         when {
             ui.loading -> CenteredLoading()
-            e == null -> EmptyState("Event not found", "It may have been removed, or you may no longer have access.")
+            e == null -> EmptyState("Event not found", "It may have been removed, or you may no longer have access.", mood = com.laddu.app.core.ui.components.MascotMood.CONCERNED)
             else -> {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(eventIcon(e.type), null, tint = categoryColor(e.type.category), modifier = Modifier.size(30.dp))
