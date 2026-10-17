@@ -58,3 +58,16 @@ firebase functions:secrets:set TURN_SECRET
 
 The Blaze (pay-as-you-go) plan is required for Cloud Functions. Then enable the switch on the camera phone.
 Without a configured endpoint the function answers "not configured" and the app simply keeps its local result.
+
+## Cloud assistant (`askAssistant`) — implemented, NOT deployed, NOT run against a real provider
+Callable in `functions/index.js`; pure logic and tests in `functions/assistant.js` / `assistant.test.js`
+(`cd functions && node --test assistant.test.js`, 5 tests pass).
+
+- Caller must be signed in and be the camera's owner or a paired viewer; 20 questions per user per hour.
+- The server reads at most 200 events (max 7 days) of that one camera, and computes counts and hazard lists itself (`facts`).
+- Provider contract: `POST ASSISTANT_URL` with `{schema:"laddu-assistant-v1", question, facts}` and `Authorization: Bearer ASSISTANT_KEY`;
+  reply `{answer: string <=1500 chars, references: [eventId...]}`. References to events not in `facts` reject the whole reply.
+- `ASSISTANT_URL=mock` returns a canned reply for emulator runs. Unset => `failed-precondition`, the app should fall back to the local assistant.
+- Setup: `firebase functions:secrets:set ASSISTANT_KEY`, set `ASSISTANT_URL`, deploy (Blaze plan needed).
+- Android client (chat screen calling this function, consent toggle) is NOT written yet; the existing local `AssistantEngine` still serves all answers.
+- Limits: the model's prose is not fact-checked beyond event references; the app must show `facts` separately and label the prose "cloud AI".

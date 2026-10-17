@@ -235,3 +235,64 @@ exports.analyzeHazardEvidence = onCall({ secrets: [ANALYZER_KEY], timeoutSeconds
   if (!out || out.eventId !== eventId) throw new HttpsError("internal", "Analyzer response did not match the request.");
   return out; // the app validates the schema again before storing anything
 });
+
+/**
+ * Cloud pet assistant (RAG over the caller's own events). The server fetches only events of one camera the caller can
+ * read, computes the facts itself and asks the configured model (ASSISTANT_URL / ASSISTANT_KEY, or "mock") for prose.
+ * The model never sees other cameras, never queries anything, and its references are checked against the facts.
+ */
+const assistant = require("./assistant");
+const ASSISTANT_KEY = defineSecret("ASSISTANT_KEY");
+const ASSISTANT_URL = defineString("ASSISTANT_URL", { default: "" });
+
+exports.askAssistant = onCall({ secrets: [ASSISTANT_KEY], timeoutSeconds: 45, memory: "256MiB" }, async (request) => {
+  if (!request.auth) throw new HttpsError("unauthenticated", "Sign in first.");
+  const uid = request.auth.uid;
+  const { cameraId, days } = request.data || {};
+  const question = assistant.cleanQuestion((request.data || {}).question);
+  if (!question) throw new HttpsError("invalid-argument", "question");
+  if (typeof cameraId !== "string" || !cameraId || cameraId.length > 128) throw new HttpsError("invalid-argument", "cameraId");
+
+  const owner = ((await db.doc(`devices/${cameraId}`).get()).data() || {}).ownerId;
+  const viewer = owner !== uid && (await db.doc(`deviceUsers/${cameraId}_${uid}`).get()).exists;
+  if (owner !== uid && !viewer) throw new HttpsError("permission-denied", "No access to this camera.");
+
+  // 20 questions per user per hour
+  const hour = Math.floor(Date.now() / 3600000);
+  const usage = db.doc(`assistantUsage/${uid}`);
+  await db.runTransaction(async (tx) => {
+    const d = (await tx.get(usage)).data() || {};
+    const count = d.hour === hour ? d.count || 0 : 0;
+    if (count >= 20) throw new HttpsError("resource-exhausted", "Hourly assistant limit reached.");
+    tx.set(usage, { hour, count: count + 1 });
+  });
+
+  const url = ASSISTANT_URL.value();
+  if (!url) throw new HttpsError("failed-precondition", "The cloud assistant is not configured on the server.");
+
+  const now = Date.now();
+  const [from, to] = assistant.rangeFor(days, now);
+  const snap = await db.collection("events").where("cameraId", "==", cameraId).where("timestamp", ">=", from)
+    .orderBy("timestamp", "desc").limit(assistant.MAX_EVENTS + 1).get();
+  const events = snap.docs.map((d) => ({ id: d.id, ...d.data() })).reverse();
+  const facts = assistant.buildFacts(events, from, to);
+  if (events.length > assistant.MAX_EVENTS) facts.truncated = true;
+
+  let out;
+  if (url === "mock") out = assistant.mockProvider({ facts });
+  else {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${ASSISTANT_KEY.value()}` },
+      body: JSON.stringify({ schema: "laddu-assistant-v1", question, facts }),
+      signal: AbortSignal.timeout(35000),
+    });
+    if (!res.ok) throw new HttpsError("unavailable", `Assistant provider returned ${res.status}.`);
+    out = await res.json();
+  }
+  let checked;
+  try { checked = assistant.validateAnswer(out, facts.eventIds); }
+  catch (e) { throw new HttpsError("internal", "The assistant reply failed validation and was discarded."); }
+  // facts come from the server, answer is model prose: the app shows them separately and labels the prose as cloud AI
+  return { ...checked, facts: { eventCount: facts.eventCount, byType: facts.byType, truncated: facts.truncated, fromMs: from, toMs: to }, source: "cloud-ai" };
+});
