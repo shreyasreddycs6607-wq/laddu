@@ -71,3 +71,9 @@ Callable in `functions/index.js`; pure logic and tests in `functions/assistant.j
 - Setup: `firebase functions:secrets:set ASSISTANT_KEY`, set `ASSISTANT_URL`, deploy (Blaze plan needed).
 - Android client (chat screen calling this function, consent toggle) is NOT written yet; the existing local `AssistantEngine` still serves all answers.
 - Limits: the model's prose is not fact-checked beyond event references; the app must show `facts` separately and label the prose "cloud AI".
+
+### Assistant chat screen (Android) — compiled and unit-tested, NOT seen on a device
+`features/assistant/AssistantScreen.kt` now has an opt-in "Use cloud AI for answers" switch (off by default, stored per viewer device),
+a Cancel button while waiting, and falls back to the on-device answer with a "Try the cloud again" link when the call fails.
+Cloud replies are labelled "Cloud AI interpretation of saved events (not verified)"; "Open event" links only appear for events this phone already has.
+`CloudReplyParser` (2 unit tests) rejects empty/oversized answers and drops unknown references. Not done: speech input/output, saved conversation history.

@@ -22,6 +22,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.size
+import com.laddu.app.core.datastore.SettingsRepository
+import com.laddu.app.core.insights.CloudAssistantClient
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -58,11 +66,28 @@ import kotlinx.coroutines.flow.stateIn
 import java.util.Calendar
 import javax.inject.Inject
 
-data class ChatMessage(val fromUser: Boolean, val text: String, val answer: AssistantAnswer? = null, val recordCount: Int = 0)
+data class ChatMessage(
+    val fromUser: Boolean, val text: String, val answer: AssistantAnswer? = null, val recordCount: Int = 0,
+    /** Set when the cloud call failed: the app answered locally and offers to try the cloud again. */
+    val retryQuestion: String? = null,
+)
+
+private const val CLOUD_BASIS = "Cloud AI interpretation of saved events (not verified)"
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
-class AssistantViewModel @Inject constructor(private val events: EventRepository) : ViewModel() {
+class AssistantViewModel @Inject constructor(
+    private val events: EventRepository,
+    private val settings: SettingsRepository,
+    private val cloud: CloudAssistantClient,
+) : ViewModel() {
+    val cloudEnabled: StateFlow<Boolean> = settings.cloudAssistant.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    fun setCloudEnabled(on: Boolean) { viewModelScope.launch { settings.setCloudAssistant(on) } }
+
+    private val _busy = MutableStateFlow(false)
+    val busy: StateFlow<Boolean> = _busy
+    private var job: Job? = null
+
     private val camera = MutableStateFlow<String?>(null)
     private val engine = AssistantEngine()
 
@@ -79,11 +104,39 @@ class AssistantViewModel @Inject constructor(private val events: EventRepository
 
     fun ask(question: String) {
         val q = question.trim()
-        if (q.isEmpty()) return
+        val cam = camera.value
+        if (q.isEmpty() || _busy.value) return
         val all = history.value
         val now = System.currentTimeMillis()
-        val answer = engine.answer(q, all, now, previousDays(all, now))
-        _messages.value = _messages.value + ChatMessage(true, q) + ChatMessage(false, answer.text, answer, all.size)
+        val local = engine.answer(q, all, now, previousDays(all, now))
+        _messages.value = _messages.value + ChatMessage(true, q)
+        if (!cloudEnabled.value || cam == null) {
+            _messages.value = _messages.value + ChatMessage(false, local.text, local, all.size)
+            return
+        }
+        _busy.value = true
+        job = viewModelScope.launch {
+            try {
+                cloud.ask(cam, q, all.map { it.eventId }.toSet()).fold(
+                    { r ->
+                        val text = r.answer + if (r.truncated) "\n\nOnly the most recent events were included." else ""
+                        _messages.value = _messages.value +
+                            ChatMessage(false, text, AssistantAnswer(text, r.references, CLOUD_BASIS, uncertain = true), r.eventCount)
+                    },
+                    { e ->
+                        _messages.value = _messages.value + ChatMessage(
+                            false, "${e.message} Here is the on-device answer instead:\n\n${local.text}", local, all.size, retryQuestion = q,
+                        )
+                    },
+                )
+            } finally { _busy.value = false }
+        }
+    }
+
+    fun cancel() {
+        if (!_busy.value) return
+        job?.cancel(); _busy.value = false
+        _messages.value = _messages.value + ChatMessage(false, "Cancelled.")
     }
 
     private fun previousDays(all: List<LadduEvent>, now: Long): List<DaySummary> {
@@ -100,11 +153,16 @@ private val SUGGESTIONS = listOf("What happened today?", "Any hazard events toda
 fun AssistantScreen(cameraId: String?, onOpenEvent: (String) -> Unit, vm: AssistantViewModel = hiltViewModel()) {
     LaunchedEffect(cameraId) { vm.setCamera(cameraId) }
     val messages by vm.messages.collectAsState()
-    AssistantContent(messages, vm::ask, onOpenEvent, enabled = cameraId != null)
+    val cloud by vm.cloudEnabled.collectAsState()
+    val busy by vm.busy.collectAsState()
+    AssistantContent(messages, vm::ask, onOpenEvent, enabled = cameraId != null, cloud = cloud, onCloud = vm::setCloudEnabled, busy = busy, onCancel = vm::cancel)
 }
 
 @Composable
-fun AssistantContent(messages: List<ChatMessage>, onAsk: (String) -> Unit, onOpenEvent: (String) -> Unit, enabled: Boolean = true) {
+fun AssistantContent(
+    messages: List<ChatMessage>, onAsk: (String) -> Unit, onOpenEvent: (String) -> Unit, enabled: Boolean = true,
+    cloud: Boolean = false, onCloud: (Boolean) -> Unit = {}, busy: Boolean = false, onCancel: () -> Unit = {},
+) {
     val listState = rememberLazyListState()
     var input by remember { mutableStateOf("") }
     LaunchedEffect(messages.size) { if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex) }
@@ -116,18 +174,36 @@ fun AssistantContent(messages: List<ChatMessage>, onAsk: (String) -> Unit, onOpe
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.padding(horizontal = 16.dp),
         )
+        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Use cloud AI for answers", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    if (cloud) "Your question and up to 7 days of this camera's event summaries (no video or photos) go to your own Firebase function and an AI model. Answers are interpretations, not verified facts."
+                    else "Off: answers are worked out on this phone from saved events only.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Switch(cloud, onCloud, modifier = Modifier.testTag("sw_cloud_assistant"))
+        }
         LazyColumn(Modifier.weight(1f).fillMaxWidth(), state = listState, contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(messages) { m -> Bubble(m, onOpenEvent) }
+            items(messages) { m -> Bubble(m, onOpenEvent, onAsk) }
+            if (busy) item {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                    Text("Asking the cloud assistant…", style = MaterialTheme.typography.bodyMedium)
+                    TextButton(onCancel, modifier = Modifier.testTag("assistant_cancel")) { Text("Cancel") }
+                }
+            }
         }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SUGGESTIONS.forEach { s -> AssistChip(onClick = { onAsk(s) }, label = { Text(s) }, enabled = enabled) }
+            SUGGESTIONS.forEach { s -> AssistChip(onClick = { onAsk(s) }, label = { Text(s) }, enabled = enabled && !busy) }
         }
         Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
             OutlinedTextField(
                 input, { input = it }, Modifier.weight(1f).testTag("assistant_input"), enabled = enabled, singleLine = true,
                 placeholder = { Text(if (enabled) "Ask about your dog…" else "Pair a camera first") },
             )
-            IconButton({ onAsk(input); input = "" }, enabled = enabled && input.isNotBlank(), modifier = Modifier.testTag("assistant_send")) {
+            IconButton({ onAsk(input); input = "" }, enabled = enabled && !busy && input.isNotBlank(), modifier = Modifier.testTag("assistant_send")) {
                 Icon(Icons.AutoMirrored.Filled.Send, "Send")
             }
         }
@@ -135,7 +211,7 @@ fun AssistantContent(messages: List<ChatMessage>, onAsk: (String) -> Unit, onOpe
 }
 
 @Composable
-private fun Bubble(m: ChatMessage, onOpenEvent: (String) -> Unit) {
+private fun Bubble(m: ChatMessage, onOpenEvent: (String) -> Unit, onRetry: (String) -> Unit) {
     Box(Modifier.fillMaxWidth(), contentAlignment = if (m.fromUser) Alignment.CenterEnd else Alignment.CenterStart) {
         Column(
             Modifier.widthIn(max = 320.dp).clip(RoundedCornerShape(18.dp))
@@ -153,6 +229,12 @@ private fun Bubble(m: ChatMessage, onOpenEvent: (String) -> Unit) {
                     },
                     style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                m.retryQuestion?.let { q ->
+                    Text(
+                        "Try the cloud again", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.padding(top = 6.dp).clickable { onRetry(q) },
+                    )
+                }
                 a.eventIds.take(3).forEachIndexed { i, id ->
                     Text(
                         "Open event ${i + 1}", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge,

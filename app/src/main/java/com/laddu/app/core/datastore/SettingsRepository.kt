@@ -42,6 +42,7 @@ class SettingsRepository @Inject constructor(private val store: DataStore<Prefer
         val network = stringPreferencesKey("network_settings")
         val oemGuideSeen = booleanPreferencesKey("oem_guide_seen")
         val localOnly = booleanPreferencesKey("local_only")
+        val cloudAssistant = booleanPreferencesKey("cloud_assistant")
     }
 
     private fun <T> json(key: Preferences.Key<String>, parse: (JSONObject?) -> T): Flow<T> =
@@ -101,6 +102,10 @@ class SettingsRepository @Inject constructor(private val store: DataStore<Prefer
         val cur = NotificationPrefs.fromJson(p[K.notif]?.let { runCatching { JSONObject(it) }.getOrNull() })
         p[K.notif] = transform(cur).toJson().toString()
     }
+
+    /** Opt-in, per viewer device: questions go to your own Firebase function, which reads that camera's recent events. Off by default. */
+    val cloudAssistant: Flow<Boolean> = store.data.map { it[K.cloudAssistant] ?: false }
+    suspend fun setCloudAssistant(on: Boolean) = store.edit { it[K.cloudAssistant] = on }
 
     /** Hazard events this viewer has marked as reviewed. Per device on purpose: viewers cannot write to events. */
     val reviewedEvents: Flow<Set<String>> = store.data.map { (it[K.reviewed] ?: "").split(',').filter { s -> s.isNotBlank() }.toSet() }
