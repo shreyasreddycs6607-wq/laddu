@@ -40,3 +40,20 @@ laddu.turn.credential=dev-password
 
 ## Test it
 Camera on home Wi-Fi, viewer on mobile data, Settings → Network → **Always use relay** ON → Live. If video appears, TURN works end-to-end. (Turn the switch off again to save relay bandwidth.)
+
+## Home Proxmox server (Option A on your own hardware) — script written, NOT yet run
+1. In the Proxmox web UI open the node's **Shell** and create a small container (check names with `pveam available --section system | grep ubuntu`; adjust storage, bridge, IP and gateway to your network):
+   ```bash
+   pveam update && pveam download local <ubuntu-template-from-the-list>
+   pct create 200 local:vztmpl/<that-template> --hostname turn --memory 512 --cores 1 \
+     --rootfs local-lvm:4 --unprivileged 1 --onboot 1 \
+     --net0 name=eth0,bridge=vmbr0,ip=192.168.1.68/24,gw=192.168.1.1
+   pct start 200 && pct enter 200
+   ```
+2. Inside the container: `apt-get update && apt-get install -y curl`, fetch `scripts/turn/setup_coturn.sh` from this repo, then
+   `bash setup_coturn.sh <your-public-IP-or-DDNS-name>`. It prints the three `laddu.turn.*` lines once.
+3. Router: forward UDP+TCP 3478 and UDP 49152-49252 to the container. Your ISP must give you a real public IP (no CGNAT); check that the
+   router's WAN address equals what a "what is my IP" site shows. Home IPs change, so a DDNS name is better than a raw IP.
+4. Put the printed lines in `local.properties`, rebuild the debug APK, then do the **Test it** steps above.
+Security notes: the script blocks relaying into private networks (except the container itself) and caps allocations; the static password is
+dev-only and lives in the debug APK. Production should use `getTurnCredentials` (needs Blaze). Not verified against real traffic.
